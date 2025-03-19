@@ -1,4 +1,5 @@
 import customtkinter as ctk
+from PIL import Image, ImageTk
 import tkinter.filedialog as fd
 import tkinter as tk
 import math
@@ -10,32 +11,38 @@ class TournamentModel:
         self.rounds = []  # Hver runde er en liste med kamper
 
     def build_bracket(self, teams):
-        # Kopier og randomiser lagrekkefølgen
         teams_shuffled = teams[:]
         random.shuffle(teams_shuffled)
-        self.teams = teams_shuffled
-        n = len(teams_shuffled)
-        # Finn neste makt av 2 og fyll på med "BYE" for manglende lag
+        self.teams = [{"name": team, "logo": None} for team in teams_shuffled]  # lagres med logo=None foreløpig
+        n = len(self.teams)
         power = 2 ** math.ceil(math.log2(n))
-        padded_teams = teams_shuffled + ["BYE"] * (power - n)
-        # Første runde: antall kamper = power // 2
+        padded_teams = self.teams + [{"name": "BYE", "logo": None}] * (power - n)
+
         round1 = []
         for i in range(0, len(padded_teams), 2):
-            match = {"team1": padded_teams[i], "team2": padded_teams[i+1],
-                     "winner": None, "start_time": None}
+            match = {
+                "team1": padded_teams[i],
+                "team2": padded_teams[i + 1],
+                "winner": None,
+                "start_time": None
+            }
             round1.append(match)
         self.rounds = [round1]
-        # Totalt antall runder = log2(power)
+
         total_rounds = int(math.log2(power))
-        # Bygg de påfølgende rundene (runde 2 til finalen)
         for r in range(2, total_rounds + 1):
             num_matches = power // (2 ** r)
             matches = []
             for i in range(num_matches):
-                match = {"team1": None, "team2": None,
-                         "winner": None, "start_time": None}
+                match = {
+                    "team1": None,
+                    "team2": None,
+                    "winner": None,
+                    "start_time": None
+                }
                 matches.append(match)
             self.rounds.append(matches)
+
 
     def set_winner(self, round_index, match_index, winner):
         self.rounds[round_index][match_index]["winner"] = winner
@@ -76,8 +83,21 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         self.canvas = tk.Canvas(self, bg=canvas_bg)
         self.canvas.pack(fill="both", expand=True)
         self.canvas.bind("<Configure>", lambda event: self.draw_bracket())
+
+        self.images = []  # Holder referanser til bilder
+
         self.draw_bracket()
         
+    def show_winner_popup(self, winner):
+        popup = ctk.CTkToplevel(self)
+        popup.title("🏆 Vinner av turnering! 🏆")
+        popup.geometry("400x400")
+
+        name_label = ctk.CTkLabel(popup, text=f"Vinneren er:\n{winner['name']}",
+                                font=("Arial", 30), pady=20)
+        name_label.pack()
+
+
 
     def draw_bracket(self):
         self.canvas.delete("all")
@@ -86,7 +106,6 @@ class TournamentBracketCanvas(ctk.CTkFrame):
             return
         num_rounds = len(rounds)
 
-        self.canvas.update_idletasks()
         canvas_width = self.canvas.winfo_width()
         canvas_height = self.canvas.winfo_height()
         left_margin = 50
@@ -94,31 +113,26 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         top_margin = 50
         bottom_margin = 50
 
-        # Størrelse på kampboksene
         box_width = 250
         box_height = 80
 
-        if num_rounds > 1:
-            horizontal_spacing = (canvas_width - left_margin - right_margin - num_rounds * box_width) / (num_rounds - 1)
-        else:
-            horizontal_spacing = 0
+        horizontal_spacing = ((canvas_width - left_margin - right_margin - num_rounds * box_width) /
+                              (num_rounds - 1)) if num_rounds > 1 else 0
 
         num_matches_r0 = len(rounds[0])
-        if num_matches_r0 > 1:
-            vertical_spacing = (canvas_height - top_margin - bottom_margin - num_matches_r0 * box_height) / (num_matches_r0 - 1)
-        else:
-            vertical_spacing = 0
+        vertical_spacing = ((canvas_height - top_margin - bottom_margin - num_matches_r0 * box_height) /
+                            (num_matches_r0 - 1)) if num_matches_r0 > 1 else 0
 
-        # Beregn posisjonene for hver kampboks
         positions = []
         round0_positions = []
         for i in range(num_matches_r0):
-            y = top_margin + i * (box_height + vertical_spacing) + box_height/2
-            x = left_margin + box_width/2
+            y = top_margin + i * (box_height + vertical_spacing) + box_height / 2
+            x = left_margin + box_width / 2
             round0_positions.append((x, y))
         positions.append(round0_positions)
+
         for r in range(1, num_rounds):
-            prev_positions = positions[r-1]
+            prev_positions = positions[r - 1]
             current_positions = []
             num_matches = len(rounds[r])
             for i in range(num_matches):
@@ -126,50 +140,62 @@ class TournamentBracketCanvas(ctk.CTkFrame):
                     y = (prev_positions[2 * i][1] + prev_positions[2 * i + 1][1]) / 2
                 else:
                     y = prev_positions[2 * i][1]
-                x = left_margin + r * (box_width + horizontal_spacing) + box_width/2
+                x = left_margin + r * (box_width + horizontal_spacing) + box_width / 2
                 current_positions.append((x, y))
             positions.append(current_positions)
 
-        # Tegn kampboksene og de flerdelte linjene mellom rundene
+        self.images.clear()
         for r, round_matches in enumerate(rounds):
             for i, match in enumerate(round_matches):
                 (x, y) = positions[r][i]
-                x0 = x - box_width/2
-                y0 = y - box_height/2
-                x1 = x + box_width/2
-                y1 = y + box_height/2
+                x0, y0 = x - box_width / 2, y - box_height / 2
+                x1, y1 = x + box_width / 2, y + box_height / 2
                 self.canvas.create_rectangle(x0, y0, x1, y1, fill="gray20", outline="black")
+
                 start_text = f"Start: {match['start_time']}" if match["start_time"] else ""
-                if match["winner"]:
-                    text = f"Vinner:\n{match['winner']}"
-                else:
-                    team1 = match["team1"] if match["team1"] is not None else "TBD"
-                    team2 = match["team2"] if match["team2"] is not None else "TBD"
-                    text = f"{team1}\nvs\n{team2}"
-                # Vis starttid over boksen
-                self.canvas.create_text(x, y0-20, text=start_text, font=("Helvetica", 12), justify="center", fill="white")
-                self.canvas.create_text(x, y, text=text, font=("Helvetica", 16), justify="center", fill="white")
-                # Tegn forbindelseslinjer fra barn-boksene i forrige runde
+                self.canvas.create_text(x, y0 - 20, text=start_text, font=("Helvetica", 12), fill="white")
+
+                team1_name = match["team1"]["name"] if match["team1"] else "TBD"
+                team2_name = match["team2"]["name"] if match["team2"] else "TBD"
+                text = f"{team1_name}\nvs\n{team2_name}"
+                self.canvas.create_text(x, y, text=text, font=("Helvetica", 16), fill="white")
+
+                # Tegne logoer
+                logo_size = 40
+                padding = 5
+                if match["team1"] and match["team1"]["logo"]:
+                    try:
+                        img1 = Image.open(match["team1"]["logo"]).resize((logo_size, logo_size))
+                        img1_tk = ImageTk.PhotoImage(img1)
+                        self.canvas.create_image(x0 + logo_size / 2 + padding, y, image=img1_tk)
+                        self.images.append(img1_tk)
+                    except Exception as e:
+                        print(f"Feil ved lasting av logo for {team1_name}: {e}")
+
+                if match["team2"] and match["team2"]["logo"]:
+                    try:
+                        img2 = Image.open(match["team2"]["logo"]).resize((logo_size, logo_size))
+                        img2_tk = ImageTk.PhotoImage(img2)
+                        self.canvas.create_image(x1 - logo_size / 2 - padding, y, image=img2_tk)
+                        self.images.append(img2_tk)
+                    except Exception as e:
+                        print(f"Feil ved lasting av logo for {team2_name}: {e}")
+
                 if r > 0:
                     child_index = i * 2
-                    parent_x_left = x0  # venstre kant av denne boksen
-                    # For hvert barn (det kan være én eller to)
-                    if child_index < len(positions[r-1]):
-                        (child_x, child_y) = positions[r-1][child_index]
-                        child_x_right = child_x + box_width/2  # høyre kant av barnets boks
-                        x_mid = (child_x_right + parent_x_left) / 2
-                        # Tre segmenter: horisontalt, vertikalt, så horisontalt
-                        self.canvas.create_line(child_x_right, child_y, x_mid, child_y, fill="white")
-                        self.canvas.create_line(x_mid, child_y, x_mid, y, fill="white")
-                        self.canvas.create_line(x_mid, y, parent_x_left, y, fill="white")
-                    if child_index + 1 < len(positions[r-1]):
-                        (child_x2, child_y2) = positions[r-1][child_index+1]
-                        child_x2_right = child_x2 + box_width/2
-                        x_mid2 = (child_x2_right + parent_x_left) / 2
-                        self.canvas.create_line(child_x2_right, child_y2, x_mid2, child_y2, fill="white")
-                        self.canvas.create_line(x_mid2, child_y2, x_mid2, y, fill="white")
-                        self.canvas.create_line(x_mid2, y, parent_x_left, y, fill="white")
+                    parent_x_left = x0
+                    for idx_offset in [0, 1]:
+                        child_idx = child_index + idx_offset
+                        if child_idx < len(positions[r - 1]):
+                            child_x, child_y = positions[r - 1][child_idx]
+                            child_x_right = child_x + box_width / 2
+                            mid_x = (child_x_right + parent_x_left) / 2
+                            self.canvas.create_line(child_x_right, child_y, mid_x, child_y, fill="white")
+                            self.canvas.create_line(mid_x, child_y, mid_x, y, fill="white")
+                            self.canvas.create_line(mid_x, y, parent_x_left, y, fill="white")
+
         self.canvas.config(scrollregion=self.canvas.bbox("all"))
+
         
         
 
@@ -191,19 +217,31 @@ class ControlWindow(ctk.CTkToplevel):
         team_entry_label.pack(pady=5)
         self.team_text = tk.Text(self, height=20, width=60)
         self.team_text.pack(pady=5)
-        self.team_text.insert("1.0", "Lag 1\nLag 2\nLag 3\nLag 4\nLag 5\nLag 6\nLag 7\nLag 8\nLag 9\nLag 10\nLag 11\nLag 12\nLag 13\nLag 14\nLag 15\nLag 16")
+        self.team_text.insert("1.0", "Lag 1\nLag 2\nLag 3\nLag 4") #\nLag 5\nLag 6\nLag 7\nLag 8\nLag 9\nLag 10\nLag 11\nLag 12\nLag 13\nLag 14\nLag 15\nLag 16
         set_teams_button = ctk.CTkButton(self, text="Bygg Brakett", command=self.build_bracket)
         set_teams_button.pack(pady=5)
         self.match_controls_frame = ctk.CTkFrame(self)
         self.match_controls_frame.pack(fill="both", expand=True, pady=10)
         self.draw_match_controls()
 
+
+
     def build_bracket(self):
-        team_list = self.team_text.get("1.0", "end").strip().splitlines()
-        if team_list:
-            self.tournament_model.build_bracket(team_list)
-            self.draw_match_controls()
-            self.bracket_canvas.refresh()
+        team_names = self.team_text.get("1.0", "end").strip().splitlines()
+        teams = []
+        for name in team_names:
+            logo_path = False #fd.askopenfilename(title=f"Velg logo for {name}", filetypes=[("Image files", ".png .jpg .jpeg .gif")])
+            teams.append({"name": name, "logo": logo_path if logo_path else None})
+
+        self.tournament_model.build_bracket([team["name"] for team in teams])
+
+        # Lagre logoene separat
+        for i, team in enumerate(self.tournament_model.teams):
+            team["logo"] = teams[i]["logo"]
+
+        self.draw_match_controls()
+        self.bracket_canvas.refresh()
+
 
     def draw_match_controls(self):
         for widget in self.match_controls_frame.winfo_children():
@@ -215,8 +253,8 @@ class ControlWindow(ctk.CTkToplevel):
             for mi, match in enumerate(matches):
                 frame = ctk.CTkFrame(self.match_controls_frame)
                 frame.pack(pady=5, fill="x")
-                team1 = match["team1"] if match["team1"] else "TBD"
-                team2 = match["team2"] if match["team2"] else "TBD"
+                team1 = match["team1"]['name'] if match["team1"] else "TBD"
+                team2 = match["team2"]['name'] if match["team2"] else "TBD"
                 info_label = ctk.CTkLabel(frame, text=f"Kamp {mi+1}: {team1} vs {team2}")
                 info_label.pack(side="left", padx=5)
                 if match["winner"]:
@@ -235,10 +273,20 @@ class ControlWindow(ctk.CTkToplevel):
                 btn2.pack(side="right", padx=5)
                 btn1.pack(side="right", padx=5)
 
-    def set_winner(self, round_index, match_index, winner):
+    def set_winner(self, round_index, match_index, winner_name):
+        match = self.tournament_model.rounds[round_index][match_index]
+
+        if match["team1"] and match["team1"]["name"] == winner_name:
+            winner = match["team1"]
+        elif match["team2"] and match["team2"]["name"] == winner_name:
+            winner = match["team2"]
+        else:
+            winner = {"name": winner_name, "logo": None}
+
         self.tournament_model.set_winner(round_index, match_index, winner)
         self.draw_match_controls()
         self.bracket_canvas.refresh()
+
 
     def set_start_time(self, round_index, match_index):
         popup = ctk.CTkInputDialog(title="Sett starttid", text="Skriv inn starttid (f.eks. HH:MM):")

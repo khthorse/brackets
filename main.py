@@ -54,7 +54,7 @@ timer2 = Timer(master=timer_frame, initial_time=120, timer_label='Bord 2')
 
 
 # logo
-image_light = Image.open('menageriet_logo.png')-
+image_light = Image.open('menageriet_logo.png')
 #image_dark = Image.open('menageriet_logo_dark.png')
 logo = ctk.CTkImage(light_image=image_light, dark_image=image_light, size=(200, 200))
 
