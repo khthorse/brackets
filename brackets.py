@@ -65,6 +65,86 @@ class TournamentModel:
 
     def get_rounds(self):
         return self.rounds
+    
+    
+class GroupStageModel:
+    def __init__(self, teams):
+        self.teams = []
+        for team in teams:
+            self.teams.append({
+                "name": team["name"],
+                "logo": team.get("logo"),
+                "wins": 0,
+                "cups_hit": 0,
+                "cups_missed": 0,
+                "total_cups_diff": 0
+            })
+        self.matches = []
+
+    def generate_matches(self):
+        teams_shuffled = self.teams[:]
+        random.shuffle(teams_shuffled)
+        
+        n = len(teams_shuffled)
+        assert n % 2 == 0, "Antall lag bør være partall for dette oppsettet."
+        
+        # Sørg for at ingen møter samme motstander to ganger
+        round1 = []
+        for i in range(0, n, 2):
+            round1.append({"team1": teams_shuffled[i], "team2": teams_shuffled[i+1], 
+                           "team1_cups_left": None, "team2_cups_left": None, "time": None})
+
+        # Lag en ny tilfeldig rekkefølge og sørg for unike kamper
+        round2 = []
+        valid_round = False
+        while not valid_round:
+            random.shuffle(teams_shuffled)
+            round2 = [{"team1": teams_shuffled[i], "team2": teams_shuffled[i+1],
+                       "team1_cups_left": None, "team2_cups_left": None, "time": None}
+                      for i in range(0, n, 2)]
+            # sjekk at ingen par går igjen fra runde 1
+            valid_round = all(
+                set((m["team1"]["name"], m["team2"]["name"])) not in 
+                [set((m1["team1"]["name"], m1["team2"]["name"])) for m1 in round1]
+                for m in round2
+            )
+
+        self.matches = round1 + round2
+
+    def update_match_result(self, match_index, cups_left_team1, cups_left_team2):
+        match = self.matches[match_index]
+        match["team1_cups_left"] = cups_left_team1
+        match["team2_cups_left"] = cups_left_team2
+
+        # Finn riktige lag fra dictionaries
+        team1 = next(t for t in self.teams if t["name"] == match["team1"]["name"])
+        team2 = next(t for t in self.teams if t["name"] == match["team2"]["name"])
+
+        cups_hit_team1 = 10 - cups_left_team2
+        cups_hit_team2 = 10 - cups_left_team1
+
+        # Oppdater statistikk
+        team1["cups_hit"] += cups_hit_team1
+        team1["cups_missed"] += cups_hit_team2
+        team1["total_cups_diff"] = team1["cups_hit"] - team1["cups_missed"]
+
+        team2["cups_hit"] += cups_hit_team2
+        team2["cups_missed"] += cups_hit_team1
+        team2["total_cups_diff"] = team2["cups_hit"] - team2["cups_missed"]
+
+        # Oppdater seiere
+        if cups_left_team1 > cups_left_team2:
+            team1["wins"] += 1
+        elif cups_left_team2 > cups_left_team1:
+            team2["wins"] += 1
+
+
+    def standings(self):
+        return sorted(self.teams, key=lambda x: (
+            -x["wins"], -x["cups_hit"], -x["total_cups_diff"]
+        ))
+
+
 
 class TournamentBracketCanvas(ctk.CTkFrame):
     """
@@ -80,6 +160,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
             canvas_bg = "#2B2B2B"
         else:
             canvas_bg = "#FFFFFF"
+            
         self.canvas = tk.Canvas(self, bg=canvas_bg)
         self.canvas.pack(fill="both", expand=True)
         self.canvas.bind("<Configure>", lambda event: self.draw_bracket())
@@ -89,14 +170,52 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         self.draw_bracket()
         
     def show_winner_popup(self, winner):
-        popup = ctk.CTkToplevel(self)
-        popup.title("🏆 Vinner av turnering! 🏆")
-        popup.geometry("400x400")
-
-        name_label = ctk.CTkLabel(popup, text=f"Vinneren er:\n{winner['name']}",
-                                font=("Arial", 30), pady=20)
+        self.canvas.delete('all')
+        name_label = ctk.CTkLabel(self.canvas, text=f"🏆 Vinner av turnering! 🏆 \n \n{winner['name']}",
+                                font=("Arial", 80), pady=20)
         name_label.pack()
 
+    def show_group_stage(self, group_stage_model):
+        self.canvas.delete("all")  # tøm eksisterende brackets
+        self.images.clear()
+        
+        standings = group_stage_model.standings()
+        matches = group_stage_model.matches
+
+        canvas_width = self.canvas.winfo_width()
+
+        # Vis tittel
+        self.canvas.create_text(canvas_width / 2, 30, text="Gruppespill", font=("Arial", 30), fill="gold")
+
+        # Vis tabellen til venstre
+        start_y = 80
+        self.canvas.create_text(canvas_width / 4, start_y, text="Tabell", font=("Arial", 24), fill="white")
+        for idx, team in enumerate(standings, start=1):
+            y_pos = start_y + 30 + idx * 40
+            stats = (f"{idx}. {team['name']} | Seire: {team['wins']} | "
+                    f"Treff: {team['cups_hit']} | Diff: {team['total_cups_diff']}")
+            self.canvas.create_text(canvas_width / 4, y_pos, text=stats, font=("Helvetica", 16), fill="white")
+
+            # Logoer
+            if team["logo"]:
+                try:
+                    img = Image.open(team["logo"])
+                    img.thumbnail((30, 30), Image.LANCZOS)
+                    logo_img = ImageTk.PhotoImage(img)
+                    self.canvas.create_image(canvas_width / 4 - 150, y_pos, image=logo_img)
+                    self.images.append(logo_img)
+                except Exception as e:
+                    print(f"Feil ved lasting av logo: {e}")
+
+        # Vis kamper til høyre
+        matches_start_y = 80
+        self.canvas.create_text(3 * canvas_width / 4, matches_start_y, text="Kamper", font=("Arial", 24), fill="white")
+        for idx, match in enumerate(matches, start=1):
+            y_pos = matches_start_y + 30 + idx * 40
+            match_text = f"{match['team1']['name']} vs {match['team2']['name']}"
+            if match["time"]:
+                match_text += f" | 🕒 {match['time']}"
+            self.canvas.create_text(3 * canvas_width / 4, y_pos, text=match_text, font=("Helvetica", 16), fill="white")
 
 
     def draw_bracket(self):
@@ -196,8 +315,10 @@ class TournamentBracketCanvas(ctk.CTkFrame):
 
         self.canvas.config(scrollregion=self.canvas.bbox("all"))
 
-        
-        
+        last_round = rounds[-1]
+        if len(last_round) == 1 and last_round[0]["winner"]:
+            self.show_winner_popup(last_round[0]["winner"])
+            
 
     def refresh(self):
         self.draw_bracket()
@@ -220,24 +341,211 @@ class ControlWindow(ctk.CTkToplevel):
         self.team_text.insert("1.0", "Lag 1\nLag 2\nLag 3\nLag 4") #\nLag 5\nLag 6\nLag 7\nLag 8\nLag 9\nLag 10\nLag 11\nLag 12\nLag 13\nLag 14\nLag 15\nLag 16
         set_teams_button = ctk.CTkButton(self, text="Bygg Brakett", command=self.build_bracket)
         set_teams_button.pack(pady=5)
+        
+        self.logo_switch = False
+        load_logo_checkbox = ctk.CTkCheckBox(self, text="Legg til laglogoer", command=self.toggle_load_logo)
+        load_logo_checkbox.pack(pady=5)
+        
+        self.start_group_button = ctk.CTkButton(self, text="Start Gruppespill", command=self.start_group_stage)
+        self.start_bracket_button = ctk.CTkButton(self, text="Start Sluttspill", command=self.build_final_bracket)
+        self.start_bracket_button.pack_forget()  # skjul til å starte med
+
+        self.start_group_button.pack(pady=5)
         self.match_controls_frame = ctk.CTkFrame(self)
         self.match_controls_frame.pack(fill="both", expand=True, pady=10)
         self.draw_match_controls()
+        self.teams = []
+
+    def build_final_bracket(self):
+        standings = self.group_stage_model.standings()
+        top_4 = standings[:4]
+        self.tournament_model.build_bracket([team["name"] for team in top_4])
+
+        # lagre logoer og statistikk
+        for i, team in enumerate(self.tournament_model.teams):
+            team["logo"] = top_4[i]["logo"]
+            team["wins"] = top_4[i]["wins"]
+            team["cups_hit"] = top_4[i]["cups_hit"]
+            team["total_cups_diff"] = top_4[i]["total_cups_diff"]
+
+        self.bracket_canvas.refresh()
+        self.draw_match_controls()
+        # skjul sluttspillknappen når brackets er laget
+        self.start_bracket_button.pack_forget()
+    """   
+    def build_final_bracket(self):
+        
+        standings = self.group_stage_model.standings()
+        top_4 = standings[:4]
+        self.tournament_model.build_bracket([team["name"] for team in top_4])
+
+        # Lagre logoer
+        for i, team in enumerate(self.tournament_model.teams):
+            team["logo"] = top_4[i]["logo"]
+
+        self.bracket_canvas.refresh()
+        self.draw_match_controls()
+        self.start_bracket_button.pack_forget()  # skjul knapp etter bruk
+        """
+
+    def toggle_load_logo(self):
+        if self.logo_switch:
+            self.logo_switch = False
+        else:
+            self.logo_switch = True
+            
+    def set_group_winner_popup(self, match_index, winner):
+        match = self.group_stage_model.matches[match_index]
+
+        team1_name = match['team1']['name']
+        team2_name = match['team2']['name']
+
+        # Første dialog (team 1)
+        popup1 = ctk.CTkInputDialog(
+            title="Antall kopper igjen",
+            text=f"Hvor mange kopper hadde {team1_name} igjen?"
+        )
+        cups1_str = popup1.get_input()
+
+        if cups1_str is None:
+            return  # Avbryt hvis dialogen ble lukket uten input
+
+        # Andre dialog (team 2) - åpnes først etter at popup1 lukkes
+        popup2 = ctk.CTkInputDialog(
+            title="Antall kopper igjen",
+            text=f"Hvor mange kopper hadde {team2_name} igjen?"
+        )
+        cups2_str = popup2.get_input()
+
+        if cups2_str is None:
+            return  # Avbryt hvis dialogen ble lukket uten input
+
+        try:
+            cups1 = int(cups1_str)
+            cups2 = int(cups2_str)
+
+            self.group_stage_model.update_match_result(match_index, cups1, cups2)
+
+            # Oppdater GUI etter resultatet
+            self.bracket_canvas.show_group_stage(self.group_stage_model)
+        except ValueError:
+            error_popup = ctk.CTkToplevel(self)
+            error_popup.title("Feil")
+            error_label = ctk.CTkLabel(error_popup, text="Ugyldig antall kopper, prøv igjen.")
+            error_label.pack(padx=20, pady=20)
 
 
+
+    def start_group_stage(self):
+        # Sørg for at listen med teams fylles først
+        if not self.teams: 
+            self.fill_team_list()
+
+        team_list = [{"name": team["name"], "logo": team["logo"]} for team in self.teams]
+        self.group_stage_model = GroupStageModel(team_list)
+        self.group_stage_model.generate_matches()
+
+        # Vis gruppespillet direkte i bracket_canvas
+        self.bracket_canvas.show_group_stage(self.group_stage_model)
+
+        # Tegn riktige kampkontroller for gruppespill (du må lage denne!)
+        self.draw_group_match_controls()
+
+        self.start_group_button.pack_forget()
+        self.start_bracket_button.pack(pady=5)
+
+    def draw_group_match_controls(self):
+        for widget in self.match_controls_frame.winfo_children():
+            widget.destroy()
+
+        ctk.CTkLabel(self.match_controls_frame, text="Gruppespillkontroller", font=("Arial", 20)).pack(pady=5)
+
+        for idx, match in enumerate(self.group_stage_model.matches):
+            frame = ctk.CTkFrame(self.match_controls_frame)
+            frame.pack(fill="x", pady=3)
+
+            match_text = f"{match['team1']['name']} vs {match['team2']['name']}"
+            match_label = ctk.CTkLabel(frame, text=match_text)
+            match_label.pack(side="left", padx=5)
+
+            # Knapp for å velge vinner (med popup for gjenstående kopper)
+            winner_btn1 = ctk.CTkButton(frame, text=f"{match['team1']['name']} vant",
+                                        command=lambda idx=idx, winner=1: self.set_group_winner_popup(idx, winner))
+            winner_btn1.pack(side="right", padx=5)
+
+            winner_btn2 = ctk.CTkButton(frame, text=f"{match['team2']['name']} vant",
+                                        command=lambda idx=idx, winner=2: self.set_group_winner_popup(idx, winner))
+            winner_btn2.pack(side="right", padx=5)
+
+            # Tidspunkt knapp
+            time_btn = ctk.CTkButton(frame, text="Sett tidspunkt",
+                                    command=lambda idx=idx: self.set_group_match_time(idx))
+            time_btn.pack(side="right", padx=5)
+
+        update_standings_btn = ctk.CTkButton(self.match_controls_frame, text="Oppdater tabell",
+                                            command=lambda: self.bracket_canvas.show_group_stage(self.group_stage_model))
+        update_standings_btn.pack(pady=10)
+
+
+
+    
+    def set_group_match_result(self, match_index):
+        popup = ctk.CTkInputDialog(title="Kopper igjen", 
+                                text="Angi gjenstående kopper (Lag1,Lag2) f.eks 3,1")
+        result = popup.get_input()
+        try:
+            cups1, cups2 = map(int, result.split(","))
+            self.group_stage_model.update_match_result(match_index, cups1, cups2)
+        except:
+            pass
+        
+    def set_group_match_time(self, match_index):
+        popup = ctk.CTkInputDialog(title="Sett tidspunkt", text="Tidspunkt (HH:MM)")
+        time = popup.get_input()
+        if time:
+            self.group_stage_model.matches[match_index]["time"] = time
+
+    def show_standings(self):
+        standings_window = ctk.CTkToplevel(self)
+        standings_window.title("Tabell etter gruppespill")
+        standings_window.geometry("700x800")
+
+        for idx, team in enumerate(self.group_stage_model.standings(), start=1):
+            frame = ctk.CTkFrame(standings_window)
+            frame.pack(fill="x", pady=2, padx=10)
+
+            if team["logo"]:
+                img = Image.open(team["logo"])
+                img.thumbnail((40, 40), Image.LANCZOS)
+                logo_img = ImageTk.PhotoImage(img)
+                logo_label = ctk.CTkLabel(frame, image=logo_img, text="")
+                logo_label.image = logo_img
+                logo_label.pack(side="left", padx=10)
+
+            stats = (f"{idx}. {team['name']} | Wins: {team['wins']} | "
+                    f"Hit: {team['cups_hit']} | Diff: {team['total_cups_diff']}")
+
+            ctk.CTkLabel(frame, text=stats, font=("Helvetica", 16)).pack(side="left")
+
+
+    
+
+    def fill_team_list(self):
+        team_names = self.team_text.get("1.0", "end").strip().splitlines()
+        
+        logo_path = False
+        for name in team_names:
+            if self.logo_switch:
+                logo_path = fd.askopenfilename(title=f"Velg logo for {name}", filetypes=[("Image files", ".png .jpg .jpeg .gif")])
+            self.teams.append({"name": name, "logo": logo_path if logo_path else None})
 
     def build_bracket(self):
-        team_names = self.team_text.get("1.0", "end").strip().splitlines()
-        teams = []
-        for name in team_names:
-            logo_path = False #fd.askopenfilename(title=f"Velg logo for {name}", filetypes=[("Image files", ".png .jpg .jpeg .gif")])
-            teams.append({"name": name, "logo": logo_path if logo_path else None})
-
-        self.tournament_model.build_bracket([team["name"] for team in teams])
+        self.fill_team_list()
+        self.tournament_model.build_bracket([team["name"] for team in self.teams])
 
         # Lagre logoene separat
         for i, team in enumerate(self.tournament_model.teams):
-            team["logo"] = teams[i]["logo"]
+            team["logo"] = self.teams[i]["logo"]
 
         self.draw_match_controls()
         self.bracket_canvas.refresh()

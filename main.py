@@ -17,7 +17,6 @@ def find_time():
         
     return sem + year
 
-    
 
 ctk.set_appearance_mode('dark')
 #ctk.set_default_color_theme('green')
@@ -56,7 +55,6 @@ tournament_model = TournamentModel()
 bracket_frame = TournamentBracketCanvas(master=main_frame, tournament_model=tournament_model)
 
 control_window = ControlWindow(master=main_frame, tournament_model=tournament_model, bracket_canvas=bracket_frame)
-
 
 
 # Timer 1
