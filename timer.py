@@ -20,13 +20,13 @@ class Timer:
         self.canvas_size = 250
         pad = 10
 
-        bg_color = "gray20"
+        bg_color = "#2b2b2b"
         self.canvas = ctk.CTkCanvas(self.frame, width=self.canvas_size, height=self.canvas_size,
                                 bg=bg_color, highlightthickness=0)
         self.canvas.pack(pady=5)
         # Tegn en bue (arc) som viser progresjonen
         self.arc = self.canvas.create_arc(pad, pad, self.canvas_size - pad, self.canvas_size - pad,
-                                          start=90, extent=0, style="arc", width=10, outline="blue")
+                                          start=90, extent=0, style="arc", width=10, outline="#4682B4")
         # Tekst i midten av progress baren som viser nedtellingsformatet
         self.canvas_text = self.canvas.create_text(self.canvas_size/2, self.canvas_size/2,
                                                     text="", font=("Helvetica", 40), fill="white")
@@ -64,17 +64,16 @@ class Timer:
             progress = 0
         # Oppdater buens extent (negativ for med klokka)
         self.canvas.itemconfig(self.arc, extent=-progress * 360)
-        
-        
 
     def countdown(self):
         """Kjører nedtellingen og planlegger oppdateringer hvert sekund."""
+        self.start_button.configure(state=ctk.DISABLED)
         if self.current_time >= 0 and not self.paused:
             self.update_label()
             self.current_time -= 1
             self.timer_id = self.master.after(1000, self.countdown)
         if self.current_time < 0:
-            self.canvas.itemconfig(self.canvas_text, text="Ferdig!", fill="red")
+            self.canvas.itemconfig(self.canvas_text, text="Ferdig!", fill="#B46246")
             self.canvas.itemconfig(self.arc, extent=-359.999)
 
     def toggle_pause(self):
@@ -91,6 +90,7 @@ class Timer:
 
     def reset_timer(self):
         """Resetter timeren til startverdien."""
+        self.start_button.configure(state=ctk.NORMAL)
         if self.timer_id:
             self.master.after_cancel(self.timer_id)
         self.current_time = self.initial_time
@@ -110,3 +110,11 @@ class Timer:
             self.update_label()
         except ValueError:
             self.open_change_time_popup()
+            
+            
+if __name__ == "__main__":
+    ctk.set_appearance_mode('dark')
+    root = ctk.CTk()
+    root.title('Timer')
+    timer = Timer(master=root, initial_time=20, timer_label='Timer')
+    root.mainloop()
