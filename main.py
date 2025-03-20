@@ -1,10 +1,23 @@
 import customtkinter as ctk
 from timer import Timer
 from PIL import Image, ImageTk
+import time
 
 
 from brackets import TournamentModel, TournamentBracketCanvas, ControlWindow
 
+def find_time():
+    year = str(time.localtime().tm_year)
+    month = time.localtime().tm_mon
+    
+    if month <= 6:
+        sem = 'Vår '
+    else:
+        sem = 'Høst '
+        
+    return sem + year
+
+    
 
 ctk.set_appearance_mode('dark')
 #ctk.set_default_color_theme('green')
@@ -12,7 +25,7 @@ ctk.set_appearance_mode('dark')
 
 #root window
 root = ctk.CTk()
-root.title('Beerpong Turnering')
+root.title('Beerpong Turnering ' + find_time())
 root.geometry('1920x1280')
 #root.attributes('-fullscreen', True)
 #root.state('zoomed')
@@ -21,6 +34,7 @@ root.geometry('1920x1280')
 root.columnconfigure(0, weight=1)
 root.columnconfigure(1, weight=100)
 root.rowconfigure(0, weight=1)
+
 
 # left frame timer
 timer_frame = ctk.CTkFrame(master=root)
@@ -31,9 +45,10 @@ main_frame = ctk.CTkFrame(master=root)
 main_frame.grid(row=0, column=1, sticky='nsew', padx=10, pady=10)
 
 
+
 # brackets
 
-brackets_label = ctk.CTkLabel(master=main_frame, text='Beerpong Turnering Vår 2025', font=('Arial', 40))
+brackets_label = ctk.CTkLabel(master=main_frame, text='Beerpong Turnering '+ find_time(), font=('Arial', 40))
 brackets_label.pack(pady=12, padx=10)
 
 tournament_model = TournamentModel()
