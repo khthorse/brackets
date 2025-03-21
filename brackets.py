@@ -170,10 +170,20 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         self.draw_bracket()
         
     def show_winner_popup(self, winner):
+        canvas_width = self.canvas.winfo_width()
+        canvas_height = self.canvas.winfo_height()
         self.canvas.delete('all')
-        name_label = ctk.CTkLabel(self.canvas, text=f"🏆 Vinner av turnering! 🏆 \n \n{winner['name']}",
-                                font=("Arial", 80), pady=20)
-        name_label.pack()
+        self.canvas.create_text(canvas_width/2, canvas_height/2 - 300, text= f'🏆 Vinner av turnering! 🏆', font=('Arial', 60), fill='white')
+        self.canvas.create_text(canvas_width/2, canvas_height/2 - 200, text= f'{winner['name']}', font=('Arial', 60), fill='white')
+        if winner["logo"]:
+            try:
+                img = Image.open(winner["logo"])
+                img.thumbnail((canvas_height/3, canvas_height/3), Image.LANCZOS)
+                logo_img = ImageTk.PhotoImage(img)
+                self.canvas.create_image(canvas_width / 2, canvas_height/2 + canvas_height/6, image=logo_img)
+                self.images.append(logo_img)
+            except Exception as e:
+                print(f"Feil ved lasting av logo: {e}")
 
     def show_group_stage(self, group_stage_model):
         self.canvas.delete("all")  # tøm eksisterende brackets
@@ -183,39 +193,75 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         matches = group_stage_model.matches
 
         canvas_width = self.canvas.winfo_width()
+        canvas_height = self.canvas.winfo_height()
+        
 
         # Vis tittel
-        self.canvas.create_text(canvas_width / 2, 30, text="Gruppespill", font=("Arial", 30), fill="gold")
+        self.canvas.create_text(canvas_width / 2, 30, text="Gruppespill", font=("Arial", 30), fill="White")
 
-        # Vis tabellen til venstre
+        # Verdier for bokser som brukes i tabellene
         start_y = 80
-        self.canvas.create_text(canvas_width / 4, start_y, text="Tabell", font=("Arial", 24), fill="white")
+        box_pady = 5
+        box_padx = 10
+        box_height = ((canvas_height-start_y-2*box_pady)/len(standings))
+        box_width = (canvas_width/2) - 2*box_padx
+        box2_width = (canvas_width/3) - 2*box_padx 
+        
+        # Vis tabellen til venstre
+        
+        self.canvas.create_text(canvas_width / 4, start_y - 2*box_pady, text="Tabell", font=("Arial", 24), fill="white")
         for idx, team in enumerate(standings, start=1):
-            y_pos = start_y + 30 + idx * 40
-            stats = (f"{idx}. {team['name']} | Seire: {team['wins']} | "
-                    f"Treff: {team['cups_hit']} | Diff: {team['total_cups_diff']}")
-            self.canvas.create_text(canvas_width / 4, y_pos, text=stats, font=("Helvetica", 16), fill="white")
-
+            
+            box_x0, box_y0 = box_padx, start_y + box_pady + (idx-1)*box_height
+            box_x1, box_y1 = box_width - box_padx, box_y0-box_pady + box_height
+            
+            self.canvas.create_rectangle(box_x0, box_y0, box_x1, box_y1, fill='#333333')
+            text_ypos = box_y1 + box_pady - box_height/2
+            teamname_x = box_width/4
+            results_x = 3*box_width/4
+            fontsize = int(box_height/4)
+            
+            self.canvas.create_text(teamname_x, text_ypos, text=f'{idx}. {team['name']}', font=('Arial', fontsize), fill='white')
+            self.canvas.create_text(results_x, text_ypos-box_height/5, text=f'V    |    T    |    D', font=('Arial', fontsize), fill='white')
+            self.canvas.create_text(results_x, text_ypos+box_height/6, text=f'{team['wins']}    |    {team['cups_hit']}    |    {team['total_cups_diff']}', font=('Arial', fontsize), fill='white')
+            
             # Logoer
             if team["logo"]:
                 try:
                     img = Image.open(team["logo"])
-                    img.thumbnail((30, 30), Image.LANCZOS)
+                    img.thumbnail((box_height-4*box_pady, box_height-4*box_pady), Image.LANCZOS)
                     logo_img = ImageTk.PhotoImage(img)
-                    self.canvas.create_image(canvas_width / 4 - 150, y_pos, image=logo_img)
+                    self.canvas.create_image(box_width/8, text_ypos-box_pady/2, image=logo_img)
                     self.images.append(logo_img)
                 except Exception as e:
                     print(f"Feil ved lasting av logo: {e}")
 
         # Vis kamper til høyre
         matches_start_y = 80
-        self.canvas.create_text(3 * canvas_width / 4, matches_start_y, text="Kamper", font=("Arial", 24), fill="white")
+        matches_start_x = box_width + 1/2*box_width + 2*box_padx - box2_width/2
+        
+        
+        self.canvas.create_text(3 * canvas_width / 4, matches_start_y - 2*box_pady, text="Kamper", font=("Arial", 24), fill="white")
         for idx, match in enumerate(matches, start=1):
+            
+            box_x0, box_y0 = matches_start_x + box_padx, start_y + box_pady + (idx-1)*box_height
+            box_x1, box_y1 = matches_start_x + box2_width - box_padx, box_y0-box_pady + box_height
+            
+            self.canvas.create_rectangle(box_x0, box_y0, box_x1, box_y1, fill='#333333')
+            text_ypos = box_y1 + box_pady - box_height/2
+            teamname1_x = matches_start_x + box2_width/4
+            teamname2_x = matches_start_x + 3*box2_width/4
+            
+            self.canvas.create_text(teamname1_x, text_ypos, text=f'{match['team1']['name']}', font=('Arial', fontsize), fill='white')
+            self.canvas.create_text(matches_start_x + box2_width/2, text_ypos, text=f'vs', font=('Arial', fontsize), fill='white')
+            self.canvas.create_text(teamname2_x, text_ypos, text=f'{match['team2']['name']}', font=('Arial', fontsize), fill='white')
+            
+            '''
             y_pos = matches_start_y + 30 + idx * 40
             match_text = f"{match['team1']['name']} vs {match['team2']['name']}"
             if match["time"]:
                 match_text += f" | 🕒 {match['time']}"
-            self.canvas.create_text(3 * canvas_width / 4, y_pos, text=match_text, font=("Helvetica", 16), fill="white")
+            self.canvas.create_text(3 * canvas_width / 4, y_pos, text=match_text, font=("Helvetica", 16), fill="white")'''
 
 
     def draw_bracket(self):
@@ -338,7 +384,7 @@ class ControlWindow(ctk.CTkToplevel):
         team_entry_label.pack(pady=5)
         self.team_text = tk.Text(self, height=20, width=60)
         self.team_text.pack(pady=5)
-        self.team_text.insert("1.0", "Lag 1\nLag 2\nLag 3\nLag 4") #\nLag 5\nLag 6\nLag 7\nLag 8\nLag 9\nLag 10\nLag 11\nLag 12\nLag 13\nLag 14\nLag 15\nLag 16
+        self.team_text.insert("1.0", "Lag 1\nLag 2\nLag 3\nLag 4\nLag 5\nLag 6\nLag 7\nLag 8\nLag 9\nLag 10\nLag 11\nLag 12\nLag 13\nLag 14\nLag 15\nLag 16") #
         set_teams_button = ctk.CTkButton(self, text="Bygg Brakett", command=self.build_bracket)
         set_teams_button.pack(pady=5)
         
