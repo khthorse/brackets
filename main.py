@@ -61,9 +61,9 @@ control_window = ControlWindow(master=main_frame, tournament_model=tournament_mo
 timer_label = ctk.CTkLabel(master=timer_frame, text='Countdown Timer', font=('Arial', 40))
 timer_label.pack(pady=12, padx=10)
 
-timer1 = Timer(master=timer_frame, initial_time=2, timer_label='Bord 1')
+timer1 = Timer(master=timer_frame, initial_time=60*15, timer_label='Bord 1')
 
-timer2 = Timer(master=timer_frame, initial_time=120, timer_label='Bord 2')
+timer2 = Timer(master=timer_frame, initial_time=60*15, timer_label='Bord 2')
 
 
 # logo

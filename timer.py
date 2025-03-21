@@ -26,7 +26,7 @@ class Timer:
         self.canvas.pack(pady=5)
         # Tegn en bue (arc) som viser progresjonen
         self.arc = self.canvas.create_arc(pad, pad, self.canvas_size - pad, self.canvas_size - pad,
-                                          start=90, extent=0, style="arc", width=10, outline="#4682B4")
+                                          start=90, extent=0, style="arc", width=15, outline="#4682B4")
         # Tekst i midten av progress baren som viser nedtellingsformatet
         self.canvas_text = self.canvas.create_text(self.canvas_size/2, self.canvas_size/2,
                                                     text="", font=("Helvetica", 40), fill="white")
@@ -63,7 +63,13 @@ class Timer:
         else:
             progress = 0
         # Oppdater buens extent (negativ for med klokka)
-        self.canvas.itemconfig(self.arc, extent=-progress * 360)
+        ext = -progress * 360
+        self.canvas.itemconfig(self.arc, extent=ext, outline='#4682B4')
+        if progress > 8/10:
+            self.canvas.itemconfig(self.arc, outline='#C00020')
+        elif progress > 3/4:
+            self.canvas.itemconfig(self.arc, outline='#C0A000')
+        
 
     def countdown(self):
         """Kjører nedtellingen og planlegger oppdateringer hvert sekund."""
@@ -102,6 +108,20 @@ class Timer:
     def open_change_time_popup(self):
         popup = ctk.CTkInputDialog(title="Change Time", text="enter new time:  mm:ss")
         new_time = popup.get_input()
+        
+        if new_time[0] != 0:
+            if len(new_time) == 2:
+                new_time = '00:' + new_time
+            
+            if len(new_time) == 3:
+                new_time = new_time[:1] + ':' + new_time[2:]
+            
+            if len(new_time) == 4:
+                if new_time[1] == ':':
+                    new_time = '0' + new_time
+                else:
+                    new_time = new_time[:2] + ':' + new_time[2:]
+
         try:
             minutes, seconds = map(int, new_time.split(":"))
             self.current_time = minutes * 60 + seconds
