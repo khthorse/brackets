@@ -629,5 +629,7 @@ FodyWeavers.xsd
 # Additional files built by Visual Studio
 
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,visualstudio,python,git,windows,powershell
-__pycache__/brackets.cpython-312.pyc
-__pycache__/timer.cpython-312.pyc
+
+# Some folders
+
+lagbilder/
