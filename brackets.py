@@ -24,7 +24,8 @@ class TournamentModel:
                 "team1": padded_teams[i],
                 "team2": padded_teams[i + 1],
                 "winner": None,
-                "start_time": None
+                "start_time": None,
+                "played":False
             }
             round1.append(match)
         self.rounds = [round1]
@@ -38,11 +39,11 @@ class TournamentModel:
                     "team1": None,
                     "team2": None,
                     "winner": None,
-                    "start_time": None
+                    "start_time": None,
+                    "played":False
                 }
                 matches.append(match)
             self.rounds.append(matches)
-
 
     def set_winner(self, round_index, match_index, winner):
         self.rounds[round_index][match_index]["winner"] = winner
@@ -65,8 +66,7 @@ class TournamentModel:
 
     def get_rounds(self):
         return self.rounds
-    
-    
+
 class GroupStageModel:
     def __init__(self, teams):
         self.teams = []
@@ -92,7 +92,7 @@ class GroupStageModel:
         round1 = []
         for i in range(0, n, 2):
             round1.append({"team1": teams_shuffled[i], "team2": teams_shuffled[i+1], 
-                           "team1_cups_left": None, "team2_cups_left": None, "time": None})
+                           "team1_cups_left": None, "team2_cups_left": None, "time": None, "played":False})
 
         # Lag en ny tilfeldig rekkefølge og sørg for unike kamper
         round2 = []
@@ -100,7 +100,7 @@ class GroupStageModel:
         while not valid_round:
             random.shuffle(teams_shuffled)
             round2 = [{"team1": teams_shuffled[i], "team2": teams_shuffled[i+1],
-                       "team1_cups_left": None, "team2_cups_left": None, "time": None}
+                       "team1_cups_left": None, "team2_cups_left": None, "time": None, "played":False}
                       for i in range(0, n, 2)]
             # sjekk at ingen par går igjen fra runde 1
             valid_round = all(
@@ -111,8 +111,9 @@ class GroupStageModel:
 
         self.matches = round1 + round2
 
-    def update_match_result(self, match_index, cups_left_team1, cups_left_team2):
+    def update_match_result(self, match_index, cups_left_team1, cups_left_team2, winner):
         match = self.matches[match_index]
+        
         match["team1_cups_left"] = cups_left_team1
         match["team2_cups_left"] = cups_left_team2
 
@@ -123,6 +124,26 @@ class GroupStageModel:
         cups_hit_team1 = 10 - cups_left_team2
         cups_hit_team2 = 10 - cups_left_team1
 
+
+        # Oppdatering av poeng for seier eller uavgjort.
+        if not(cups_left_team1 == cups_left_team2):
+            if cups_left_team1 > cups_left_team2 and winner == 1:
+                team1['wins'] += 2
+            elif cups_left_team1 < cups_left_team2 and winner == 2:
+                team2['wins'] +=2
+            else:
+                raise ValueError
+
+        else:
+            team1['wins'] += 1
+            team2['wins'] += 1
+            if winner == 1 and cups_left_team1 == cups_hit_team2:
+                team1["wins"] += 1
+            elif winner == 2 and cups_left_team1 == cups_hit_team2:
+                team2['wins'] +=1
+            else:
+                raise ValueError
+
         # Oppdater statistikk
         team1["cups_hit"] += cups_hit_team1
         team1["cups_missed"] += cups_hit_team2
@@ -131,20 +152,13 @@ class GroupStageModel:
         team2["cups_hit"] += cups_hit_team2
         team2["cups_missed"] += cups_hit_team1
         team2["total_cups_diff"] = team2["cups_hit"] - team2["cups_missed"]
-
-        # Oppdater seiere
-        if cups_left_team1 > cups_left_team2:
-            team1["wins"] += 1
-        elif cups_left_team2 > cups_left_team1:
-            team2["wins"] += 1
-
+        
+        self.matches[match_index]["played"] = True
 
     def standings(self):
         return sorted(self.teams, key=lambda x: (
             -x["wins"], -x["cups_hit"], -x["total_cups_diff"]
         ))
-
-
 
 class TournamentBracketCanvas(ctk.CTkFrame):
     """
@@ -252,9 +266,14 @@ class TournamentBracketCanvas(ctk.CTkFrame):
             teamname2_x = matches_start_x + 3*box2_width/4 - thumbnail_size
             
             if match['time']:
-                self.canvas.create_text(teamname1_x, text_ypos + box_height/6, text=f'{match['team1']['name']}', font=('Arial', int(fontsize*3/4)), fill='white', justify='left')
-                self.canvas.create_text(matches_start_x + box2_width/2, text_ypos + box_height/6, text=f'vs', font=('Arial', fontsize), fill='white')
-                self.canvas.create_text(teamname2_x, text_ypos + box_height/6, text=f'{match['team2']['name']}', font=('Arial', int(fontsize*3/4)), fill='white', justify='right')
+                if match['played']:
+                    self.canvas.create_text(teamname1_x, text_ypos + box_height/6, text=f'{match['team1']['name']}', font=('Arial overstrike', int(fontsize*3/4)), fill='white', justify='left')
+                    self.canvas.create_text(matches_start_x + box2_width/2, text_ypos + box_height/6, text=f'vs', font=('Arial', fontsize), fill='white')
+                    self.canvas.create_text(teamname2_x, text_ypos + box_height/6, text=f'{match['team2']['name']}', font=('Arial', int(fontsize*3/4)), fill='white', justify='right')
+                else:
+                    self.canvas.create_text(teamname1_x, text_ypos + box_height/6, text=f'{match['team1']['name']}', font=('Arial', int(fontsize*3/4)), fill='white', justify='left')
+                    self.canvas.create_text(matches_start_x + box2_width/2, text_ypos + box_height/6, text=f'vs', font=('Arial', fontsize), fill='white')
+                    self.canvas.create_text(teamname2_x, text_ypos + box_height/6, text=f'{match['team2']['name']}', font=('Arial', int(fontsize*3/4)), fill='white', justify='right')
 
                 # Legg inn tidspunkt
                 self.canvas.create_text(matches_start_x + box2_width/2, time_ypos, text=f'Starter: {match['time']}', font=('Arial', int(fontsize*4/5)), fill='white')
@@ -264,6 +283,9 @@ class TournamentBracketCanvas(ctk.CTkFrame):
                 self.canvas.create_text(teamname1_x, text_ypos, text=f'{match['team1']['name']}', font=('Arial', int(fontsize*3/4)), fill='white', justify='left')
                 self.canvas.create_text(matches_start_x + box2_width/2, text_ypos, text=f'vs', font=('Arial', fontsize), fill='white')
                 self.canvas.create_text(teamname2_x, text_ypos, text=f'{match['team2']['name']}', font=('Arial', int(fontsize*3/4)), fill='white', justify='right')
+                    
+                    
+                    
                     
             # Logoer
             if match['team1']['logo']:
@@ -285,9 +307,6 @@ class TournamentBracketCanvas(ctk.CTkFrame):
                     self.images.append(logo_img)
                 except Exception as e:
                     print(f"Feil ved lasting av logo: {e}")
-            
-
-
 
     def draw_bracket(self):
         self.canvas.delete("all")
@@ -504,7 +523,7 @@ class ControlWindow(ctk.CTkToplevel):
             self.check_allowed_cup_number(cups1)
             self.check_allowed_cup_number(cups2)
             
-            self.group_stage_model.update_match_result(match_index, cups1, cups2)
+            self.group_stage_model.update_match_result(match_index, cups1, cups2, winner)
 
             # Oppdater GUI etter resultatet
             self.bracket_canvas.show_group_stage(self.group_stage_model)
@@ -575,7 +594,7 @@ class ControlWindow(ctk.CTkToplevel):
         result = popup.get_input()
         try:
             cups1, cups2 = map(int, result.split(","))
-            self.group_stage_model.update_match_result(match_index, cups1, cups2)
+            self.group_stage_model.update_match_result(match_index, cups1, cups2, None)
         except:
             pass
         

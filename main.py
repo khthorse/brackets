@@ -22,11 +22,12 @@ ctk.set_appearance_mode('dark')
 #ctk.set_default_color_theme('green')
 
 
+
 #root window
 root = ctk.CTk()
 root.title('Beerpong Turnering ' + find_time())
 root.geometry('1920x1280')
-#root.attributes('-fullscreen', True)
+
 #root.state('zoomed')
 
 #configure grid
@@ -65,6 +66,9 @@ timer1 = Timer(master=timer_frame, initial_time=60*15, timer_label='Bord 1')
 
 timer2 = Timer(master=timer_frame, initial_time=60*15, timer_label='Bord 2')
 
+
+#fullscreen_button = ctk.CTkButton(master=timer_frame, text='Fullskjerm', command=fullscreen())
+#fullscreen_button.pack(pady=12, padx=10)
 
 # logo
 image_light = Image.open('menageriet_logo.png')
