@@ -13,7 +13,7 @@ Et grafisk Python-program for å administrere et beerpong-turneringsoppsett, ink
 
 ## 🛠️ Krav
 
-- Python 3.8 eller nyere
+- Python 3.12 eller nyere
 
 ### Avhengigheter
 
