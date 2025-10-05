@@ -4,6 +4,8 @@ import tkinter.filedialog as fd
 import tkinter as tk
 import math
 import random
+import os, csv
+from pathlib import Path
 
 class TournamentModel:
     def __init__(self):
@@ -113,52 +115,79 @@ class GroupStageModel:
 
     def update_match_result(self, match_index, cups_left_team1, cups_left_team2, winner):
         match = self.matches[match_index]
-        
+
+        # Rull tilbake gammelt resultat hvis kampen var spilt
+        if match.get("played"):
+            prev_c1 = match.get("team1_cups_left")
+            prev_c2 = match.get("team2_cups_left")
+            prev_w  = match.get("winner")
+            if prev_c1 is not None and prev_c2 is not None and prev_w in (1, 2):
+                self._apply_result(match, prev_c1, prev_c2, prev_w, sign=-1)
+
+        # Lagre nytt resultat og påfør
         match["team1_cups_left"] = cups_left_team1
         match["team2_cups_left"] = cups_left_team2
+        match["winner"] = winner
+        self._apply_result(match, cups_left_team1, cups_left_team2, winner, sign=+1)
+        match["played"] = True
 
-        # Finn riktige lag fra dictionaries
+
+    def standings(self):
+        return sorted(self.teams, key=lambda x: (
+            -x["wins"], -x["cups_hit"], -x["total_cups_diff"]
+        ))
+    
+    def _apply_result(self, match, cups_left_team1, cups_left_team2, winner, sign=+1):
+        """Påfør (sign=+1) eller rull tilbake (sign=-1) et resultat i tabellen."""
         team1 = next(t for t in self.teams if t["name"] == match["team1"]["name"])
         team2 = next(t for t in self.teams if t["name"] == match["team2"]["name"])
 
         cups_hit_team1 = 10 - cups_left_team2
         cups_hit_team2 = 10 - cups_left_team1
 
-
-        # Oppdatering av poeng for seier eller uavgjort.
-        if not(cups_left_team1 == cups_left_team2):
+        # Poeng
+        if cups_left_team1 != cups_left_team2:
             if cups_left_team1 > cups_left_team2 and winner == 1:
-                team1['wins'] += 2
+                team1['wins'] += 2 * sign
             elif cups_left_team1 < cups_left_team2 and winner == 2:
-                team2['wins'] +=2
+                team2['wins'] += 2 * sign
             else:
-                raise ValueError
-
+                raise ValueError("Ugyldig kombinasjon av kopper/vinner")
         else:
-            team1['wins'] += 1
-            team2['wins'] += 1
+            team1['wins'] += 1 * sign
+            team2['wins'] += 1 * sign
             if winner == 1 and cups_left_team1 == cups_hit_team2:
-                team1["wins"] += 1
+                team1['wins'] += 1 * sign
             elif winner == 2 and cups_left_team1 == cups_hit_team2:
-                team2['wins'] +=1
+                team2['wins'] += 1 * sign
             else:
-                raise ValueError
+                raise ValueError("Ugyldig tie-break kombinasjon")
 
-        # Oppdater statistikk
-        team1["cups_hit"] += cups_hit_team1
-        team1["cups_missed"] += cups_hit_team2
+        # Statistikk
+        team1["cups_hit"]    += cups_hit_team1 * sign
+        team1["cups_missed"] += cups_hit_team2 * sign
         team1["total_cups_diff"] = team1["cups_hit"] - team1["cups_missed"]
 
-        team2["cups_hit"] += cups_hit_team2
-        team2["cups_missed"] += cups_hit_team1
+        team2["cups_hit"]    += cups_hit_team2 * sign
+        team2["cups_missed"] += cups_hit_team1 * sign
         team2["total_cups_diff"] = team2["cups_hit"] - team2["cups_missed"]
-        
-        self.matches[match_index]["played"] = True
 
-    def standings(self):
-        return sorted(self.teams, key=lambda x: (
-            -x["wins"], -x["cups_hit"], -x["total_cups_diff"]
-        ))
+    def clear_match_result(self, match_index):
+        match = self.matches[match_index]
+        if not match.get("played"):
+            return
+        prev_c1 = match.get("team1_cups_left")
+        prev_c2 = match.get("team2_cups_left")
+        prev_w  = match.get("winner")
+        if prev_c1 is not None and prev_c2 is not None and prev_w in (1, 2):
+            self._apply_result(match, prev_c1, prev_c2, prev_w, sign=-1)
+
+        match["team1_cups_left"] = None
+        match["team2_cups_left"] = None
+        match["winner"] = None
+        match["played"] = False
+
+
 
 class TournamentBracketCanvas(ctk.CTkFrame):
     """
@@ -457,7 +486,7 @@ class ControlWindow(ctk.CTkToplevel):
         self.start_bracket_button.pack_forget()  # skjul til å starte med
 
         self.start_group_button.pack(pady=5)
-        self.match_controls_frame = ctk.CTkFrame(self)
+        self.match_controls_frame = ctk.CTkScrollableFrame(self)
         self.match_controls_frame.pack(fill="both", expand=True, pady=10)
         self.draw_match_controls()
         self.teams = []
@@ -492,46 +521,66 @@ class ControlWindow(ctk.CTkToplevel):
             
     def set_group_winner_popup(self, match_index, winner):
         match = self.group_stage_model.matches[match_index]
-
         team1_name = match['team1']['name']
         team2_name = match['team2']['name']
 
-        # Første dialog (team 1)
-        popup1 = ctk.CTkInputDialog(
-            title="Antall kopper igjen",
-            text=f"Hvor mange kopper hadde {team1_name} igjen?"
-        )
-        cups1_str = popup1.get_input()
+        # Én dialog med to inputfelt
+        top = ctk.CTkToplevel(self)
+        top.title("Antall kopper igjen")
+        top.geometry("320x240")
 
-        if cups1_str is None:
-            return  # Avbryt hvis dialogen ble lukket uten input
-            
+        ctk.CTkLabel(top, text=f"{team1_name} kopper igjen (0–10):").pack(pady=(12, 4))
+        e1 = ctk.CTkEntry(top, width=120)
+        e1.pack(pady=4)
 
-        # Andre dialog (team 2) - åpnes først etter at popup1 lukkes
-        popup2 = ctk.CTkInputDialog(
-            title="Antall kopper igjen",
-            text=f"Hvor mange kopper hadde {team2_name} igjen?"
-        )
-        cups2_str = popup2.get_input()
+        ctk.CTkLabel(top, text=f"{team2_name} kopper igjen (0–10):").pack(pady=(12, 4))
+        e2 = ctk.CTkEntry(top, width=120)
+        e2.pack(pady=4)
 
-        if cups2_str is None:
-            return  # Avbryt hvis dialogen ble lukket uten input
+        # Feilmelding-etikett (vises ved behov)
+        err_lbl = ctk.CTkLabel(top, text="", text_color="tomato")
+        err_lbl.pack(pady=(6, 0))
 
-        try:
-            cups1 = int(cups1_str)
-            cups2 = int(cups2_str)
-            self.check_allowed_cup_number(cups1)
-            self.check_allowed_cup_number(cups2)
-            
-            self.group_stage_model.update_match_result(match_index, cups1, cups2, winner)
+        # Hjelper: forsøk å lagre
+        def do_save(event=None):
+            c1_str = e1.get().strip()
+            c2_str = e2.get().strip()
+            if c1_str == "" or c2_str == "":
+                err_lbl.configure(text="Fyll inn begge feltene.")
+                return
+            try:
+                c1 = int(c1_str)
+                c2 = int(c2_str)
+                self.check_allowed_cup_number(c1)
+                self.check_allowed_cup_number(c2)
 
-            # Oppdater GUI etter resultatet
-            self.bracket_canvas.show_group_stage(self.group_stage_model)
-        except ValueError:
-            error_popup = ctk.CTkToplevel(self)
-            error_popup.title("Feil")
-            error_label = ctk.CTkLabel(error_popup, text="Ugyldig antall kopper, prøv igjen.")
-            error_label.pack(padx=20, pady=20)
+                self.group_stage_model.update_match_result(match_index, c1, c2, winner)
+                self.bracket_canvas.show_group_stage(self.group_stage_model)
+                # (valgfritt) oppdater kontrollrader hvis du viser “rediger/angre”-knapper:
+                if hasattr(self, "draw_group_match_controls"):
+                    self.draw_group_match_controls()
+
+                top.destroy()
+            except ValueError:
+                err_lbl.configure(text="Ugyldig antall/kombo. Prøv igjen.")
+
+        # Knapper
+        btn_row = ctk.CTkFrame(top)
+        btn_row.pack(pady=12)
+        ctk.CTkButton(btn_row, text="Avbryt", command=top.destroy).pack(side="left", padx=6)
+        ctk.CTkButton(btn_row, text="Lagre", command=do_save).pack(side="left", padx=6)
+
+        # Enter = lagre, Esc = avbryt
+        e1.bind("<Return>", do_save)
+        e2.bind("<Return>", do_save)
+        top.bind("<Escape>", lambda _e: top.destroy())
+
+        # Gjør dialogen modal
+        top.grab_set()
+        top.focus()
+        e1.focus()
+        top.wait_window()
+
 
 
 
@@ -560,32 +609,103 @@ class ControlWindow(ctk.CTkToplevel):
         ctk.CTkLabel(self.match_controls_frame, text="Gruppespillkontroller", font=("Arial", 20)).pack(pady=5)
 
         for idx, match in enumerate(self.group_stage_model.matches):
-            frame = ctk.CTkFrame(self.match_controls_frame)
-            frame.pack(fill="x", pady=3)
+            row = ctk.CTkFrame(self.match_controls_frame)
+            row.pack(fill="x", padx=6, pady=4)
 
-            match_text = f"{match['team1']['name']} vs {match['team2']['name']}"
-            match_label = ctk.CTkLabel(frame, text=match_text)
-            match_label.pack(side="left", padx=5)
+            t1 = match['team1']['name']
+            t2 = match['team2']['name']
+            ctk.CTkLabel(row, text=f"{t1} vs {t2}").pack(side="left", padx=6)
 
-            # Knapp for å velge vinner (med popup for gjenstående kopper)
-            winner_btn1 = ctk.CTkButton(frame, text=f"{match['team1']['name']} vant",
-                                        command=lambda idx=idx, winner=1: self.set_group_winner_popup(idx, winner))
-            winner_btn1.pack(side="right", padx=5)
+            # Knappene lages alltid, men evt. deaktiveres hvis match er spilt
+            btn_t1 = ctk.CTkButton(
+                row, text=f"{t1} vant",
+                command=lambda i=idx: self.set_group_winner_popup(i, 1)
+            )
+            btn_t1.pack(side="right", padx=4)
 
-            winner_btn2 = ctk.CTkButton(frame, text=f"{match['team2']['name']} vant",
-                                        command=lambda idx=idx, winner=2: self.set_group_winner_popup(idx, winner))
-            winner_btn2.pack(side="right", padx=5)
+            btn_t2 = ctk.CTkButton(
+                row, text=f"{t2} vant",
+                command=lambda i=idx: self.set_group_winner_popup(i, 2)
+            )
+            btn_t2.pack(side="right", padx=4)
 
-            # Tidspunkt knapp
-            time_btn = ctk.CTkButton(frame, text="Sett tidspunkt",
-                                    command=lambda idx=idx: self.set_group_match_time(idx))
-            time_btn.pack(side="right", padx=5)
+            btn_time = ctk.CTkButton(
+                row, text="Sett tidspunkt",
+                command=lambda i=idx: self.set_group_match_time(i)
+            )
+            btn_time.pack(side="right", padx=4)
+
+            # Rediger/angre vises kun når kampen er spilt
+            if match.get("played"):
+                ctk.CTkButton(
+                    row, text="Rediger resultat",
+                    command=lambda i=idx: self.edit_group_result(i)
+                ).pack(side="right", padx=4)
+
+                ctk.CTkButton(
+                    row, text="Angre resultat",
+                    command=lambda i=idx: self.clear_group_result(i)
+                ).pack(side="right", padx=4)
+
+                # Deaktiver innsending av nytt resultat på samme kamp
+                btn_t1.configure(state="disabled")
+                btn_t2.configure(state="disabled")
+                btn_time.configure(state="disabled")
+
 
         update_standings_btn = ctk.CTkButton(self.match_controls_frame, text="Oppdater tabell",
                                             command=lambda: self.bracket_canvas.show_group_stage(self.group_stage_model))
         update_standings_btn.pack(pady=10)
 
+    def edit_group_result(self, match_index):
+        match = self.group_stage_model.matches[match_index]
+        top = ctk.CTkToplevel(self)
+        top.title("Rediger resultat")
+        self._place_dialog_over(top, width=320, height = 300)
 
+        t1 = match['team1']['name']
+        t2 = match['team2']['name']
+        prev_c1 = match.get("team1_cups_left") or 0
+        prev_c2 = match.get("team2_cups_left") or 0
+        prev_w  = match.get("winner") or 1
+
+        ctk.CTkLabel(top, text=f"{t1} kopper igjen (0–10):").pack(pady=(10, 4))
+        e1 = ctk.CTkEntry(top, width=120); e1.insert(0, str(prev_c1)); e1.pack(pady=4)
+
+        ctk.CTkLabel(top, text=f"{t2} kopper igjen (0–10):").pack(pady=(10, 4))
+        e2 = ctk.CTkEntry(top, width=120); e2.insert(0, str(prev_c2)); e2.pack(pady=4)
+
+        ctk.CTkLabel(top, text="Vinner:").pack(pady=(10, 4))
+        winner_var = tk.IntVar(value=prev_w)
+        ctk.CTkRadioButton(top, text=t1, variable=winner_var, value=1).pack()
+        ctk.CTkRadioButton(top, text=t2, variable=winner_var, value=2).pack()
+
+        err_lbl = ctk.CTkLabel(top, text="", text_color="tomato")
+        err_lbl.pack(pady=6)
+
+        def save(event=None):
+            try:
+                c1 = int(e1.get().strip()); c2 = int(e2.get().strip())
+                self.check_allowed_cup_number(c1)
+                self.check_allowed_cup_number(c2)
+                self.group_stage_model.update_match_result(match_index, c1, c2, winner_var.get())
+                self.bracket_canvas.show_group_stage(self.group_stage_model)
+                self.draw_group_match_controls()  # oppdatér knapper (deaktiver “vant”)
+                top.destroy()
+            except Exception:
+                err_lbl.configure(text="Ugyldig antall/kombo. Prøv igjen.")
+
+        btn_row = ctk.CTkFrame(top); btn_row.pack(pady=10)
+        ctk.CTkButton(btn_row, text="Avbryt", command=top.destroy).pack(side="left", padx=6)
+        ctk.CTkButton(btn_row, text="Lagre", command=save).pack(side="left", padx=6)
+
+        top.grab_set(); top.focus(); e1.focus()
+        top.bind("<Return>", save)
+
+    def clear_group_result(self, match_index):
+        self.group_stage_model.clear_match_result(match_index)
+        self.bracket_canvas.show_group_stage(self.group_stage_model)
+        self.draw_group_match_controls()  # aktiver “vant”-knappene igjen
 
     
     def set_group_match_result(self, match_index):
@@ -625,6 +745,100 @@ class ControlWindow(ctk.CTkToplevel):
                     f"Hit: {team['cups_hit']} | Diff: {team['total_cups_diff']}")
 
             ctk.CTkLabel(frame, text=stats, font=("Helvetica", 16)).pack(side="left")
+
+    import sys
+
+    def _place_dialog_over(self, top, width=None, height=None):
+        """Plasser Toplevel 'top' over dette vinduet (self) – riktig skjerm, riktig z-order."""
+        top.update_idletasks()
+        self.update_idletasks()
+
+        # Bestem størrelse først
+        w = int(width) if width else max(top.winfo_reqwidth(), 280)
+        h = int(height) if height else max(top.winfo_reqheight(), 160)
+
+        # Sett størrelse før posisjon (viktig for noen WM)
+        top.geometry(f"{w}x{h}")
+
+        if sys.platform == "win32":
+            try:
+                import ctypes
+                from ctypes import wintypes
+
+                user32 = ctypes.windll.user32
+
+                # Hent HWND-er
+                hwnd_parent = self.winfo_id()
+                hwnd_child  = top.winfo_id()
+
+                # Strukturer
+                class RECT(ctypes.Structure):
+                    _fields_ = [("left",   wintypes.LONG),
+                                ("top",    wintypes.LONG),
+                                ("right",  wintypes.LONG),
+                                ("bottom", wintypes.LONG)]
+
+                class MONITORINFO(ctypes.Structure):
+                    _fields_ = [("cbSize",   wintypes.DWORD),
+                                ("rcMonitor", RECT),
+                                ("rcWork",    RECT),
+                                ("dwFlags",   wintypes.DWORD)]
+
+                MONITOR_DEFAULTTONEAREST = 2
+
+                # Finn monitor for parent
+                hmon = user32.MonitorFromWindow(hwnd_parent, MONITOR_DEFAULTTONEAREST)
+                mi = MONITORINFO()
+                mi.cbSize = ctypes.sizeof(MONITORINFO)
+                user32.GetMonitorInfoW(hmon, ctypes.byref(mi))
+
+                # Parent-rect
+                pr = RECT()
+                user32.GetWindowRect(hwnd_parent, ctypes.byref(pr))
+                pw = pr.right - pr.left
+                ph = pr.bottom - pr.top
+
+                # Center over parent
+                x = pr.left + (pw - w) // 2
+                y = pr.top  + (ph - h) // 2
+
+                # Klamp til arbeidsområde på aktuell monitor
+                x = max(mi.rcWork.left,  min(x, mi.rcWork.right  - w))
+                y = max(mi.rcWork.top,   min(y, mi.rcWork.bottom - h))
+
+                SWP_NOZORDER   = 0x0004
+                SWP_NOACTIVATE = 0x0010
+                user32.SetWindowPos(hwnd_child, None, int(x), int(y), int(w), int(h), SWP_NOZORDER | SWP_NOACTIVATE)
+
+                # Sørg for at den ligger over og får fokus
+                try:
+                    top.attributes("-topmost", True)
+                    top.after(200, lambda: top.attributes("-topmost", False))
+                except Exception:
+                    pass
+
+                top.lift()
+                top.focus_set()
+                top.grab_set()
+                return
+            except Exception:
+                # Fallback til ren Tk-geo nedenfor
+                pass
+
+        # Fallback: center m/ Tk-geo (macOS/Linux eller hvis ctypes feiler)
+        px, py = self.winfo_rootx(), self.winfo_rooty()
+        pw, ph = self.winfo_width(), self.winfo_height()
+        if pw <= 1 or ph <= 1:
+            self.update_idletasks()
+            pw, ph = max(self.winfo_width(), 600), max(self.winfo_height(), 400)
+
+        x = px + (pw - w) // 2
+        y = py + (ph - h) // 2
+        top.geometry(f"{w}x{h}+{x}+{y}")
+        top.transient(self)
+        top.lift()
+        top.focus_set()
+        top.grab_set()
 
 
     
