@@ -173,11 +173,12 @@ Så lenge du:
 
 ### 🎯 Eksempelvisning
 
-<p align="left">
-  <img src="pictures/brackets.png" alt="Brackets" width="600"/>
-  <align="right">
-  <img src="pictures/controller.png" alt="Brackets" width="300"/>
+<p align="center">
+  <img src="pictures/brackets.png" alt="Brackets" width="900"/>
 </p>
 <p align="center">
-  <img src="pictures/group.png" alt="Brackets" width="600"/>
+  <img src="pictures/group.png" alt="Brackets" width="900"/>
+</p>
+<p align="center">
+  <img src="pictures/controller.png" alt="Brackets" width="500"/>
 </p>
