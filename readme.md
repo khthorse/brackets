@@ -33,7 +33,7 @@ Det inkluderer også nedtellingstimere og støtte for laglogoer.
 └── teams/               # Mappe for laglister
     ├── teams_names.txt          # Kun lagnavn
     └── teams_with_logos.csv     # Lagnavn + filbane til logo
-
+```
 
 ## 🚀 Kjøring
 ### 💾 Ferdigkompilert versjon (.exe)
@@ -41,7 +41,7 @@ Det inkluderer også nedtellingstimere og støtte for laglogoer.
 Du kan laste ned og kjøre den ferdige versjonen uten å installere Python.  
 Last ned **kun** følgende filer/mappestruktur som ligger i relase:
 
-```
+```text
 Brackets.exe
 teams/
 │
@@ -153,7 +153,7 @@ Kommentarlinjer (`# ...`) og tomme linjer ignoreres.
 
 ## 🪪 Lisens
 
-![lisens](graphics/2014-03-25-creativecommonslicenses-thumb.jpg)
+![lisens](graphics/lisens.png)
 
 Dette prosjektet er lisensiert under **Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)**.
 
