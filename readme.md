@@ -30,11 +30,33 @@ Det inkluderer også nedtellingstimere og støtte for laglogoer.
 ├── timer.py             # Modul med visuell nedtelling
 ├── graphics/
 │   └── menageriet_logo.png   # (valgfritt) logo som vises i programmet
-├── teams/               # Mappe for laglister
-│   ├── teams_names.txt          # Kun lagnavn
-│   └── teams_with_logos.csv     # Lagnavn + filbane til logo
-└── dist/ eller release/         # Inneholder ferdig kompilert .exe-fil
+└── teams/               # Mappe for laglister
+    ├── teams_names.txt          # Kun lagnavn
+    └── teams_with_logos.csv     # Lagnavn + filbane til logo
+
+
+## 🚀 Kjøring
+### 💾 Ferdigkompilert versjon (.exe)
+
+Du kan laste ned og kjøre den ferdige versjonen uten å installere Python.  
+Last ned **kun** følgende filer/mappestruktur som ligger i relase:
+
 ```
+Brackets.exe
+teams/
+│
+├── teams_names.txt
+└── teams_with_logos.csv
+```
+
+📦 **Last ned her:** [Klikk for å laste ned Brackets (exe + teams)](https://github.com/khthorse/brackets/archive/refs/heads/release.zip)
+
+Etter nedlasting:
+1. Pakk ut mappen (hvis den kommer som zip)
+2. Sørg for at `teams/`-mappen ligger i samme mappe som `.exe`-filen
+3. Dobbeltklikk på `Beerpong_Turnering.exe` for å starte programmet  
+   *(ingen installasjon nødvendig!)*
+
 
 ---
 
@@ -55,7 +77,7 @@ pip install customtkinter pillow
 
 ## 🚀 Kjøring
 
-### 🖥️ 1. Fra kildekode
+### 🖥️ Fra kildekode
 
 Kjør hovedprogrammet:
 
@@ -66,29 +88,6 @@ python main.py
 Dette åpner hovedvinduet med:
 - **to nedtellingstimere** til venstre  
 - **turneringsbraketten** og kontrollvindu til høyre  
-
----
-
-### 💾 2. Ferdigkompilert versjon (.exe)
-
-Du kan også laste ned og kjøre den ferdige versjonen uten å installere Python.  
-Last ned **kun** følgende filer/mappestruktur:
-
-```
-Beerpong_Turnering.exe
-teams/
-│
-├── teams_names.txt
-└── teams_with_logos.csv
-```
-
-📦 **Last ned her:** [Klikk for å laste ned Beerpong Turnering (exe + teams)](<link>)
-
-Etter nedlasting:
-1. Pakk ut mappen (hvis den kommer som zip)
-2. Sørg for at `teams/`-mappen ligger i samme mappe som `.exe`-filen
-3. Dobbeltklikk på `Beerpong_Turnering.exe` for å starte programmet  
-   *(ingen installasjon nødvendig!)*
 
 ---
 
@@ -111,7 +110,7 @@ Etter nedlasting:
 Du kan legge lag inn på to måter:
 
 ### 1️⃣ Kun navn
-`teams_names.txt`
+`teams_names.csv`
 ```
 Team Alpha
 Team Bravo
@@ -122,9 +121,8 @@ Team Delta
 ### 2️⃣ Navn og logo-filbane
 `teams_with_logos.csv`
 ```
-name,logo
-Team Alpha,logos/alpha.png
-Team Bravo,logos/bravo.jpg
+Team Alpha;Teams/team_logos/alpha.png
+Team Bravo;Teams/team_logos/bravo.jpg
 ```
 
 Kommentarlinjer (`# ...`) og tomme linjer ignoreres.
