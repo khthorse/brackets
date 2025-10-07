@@ -2,9 +2,22 @@ import customtkinter as ctk
 from timer import Timer
 from PIL import Image, ImageTk
 import time
-
-
+import sys
+import os
 from brackets import TournamentModel, TournamentBracketCanvas, ControlWindow
+
+
+
+def resource_path(relative_path):
+    """Finner riktig filbane både under utvikling og når programmet er pakket."""
+    try:
+        # PyInstaller lagrer midlertidige filer i en temp-mappe
+        base_path = sys._MEIPASS
+    except AttributeError:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
 
 def find_time():
     year = str(time.localtime().tm_year)
@@ -71,7 +84,8 @@ timer2 = Timer(master=timer_frame, initial_time=60*15, timer_label='Bord 2')
 #fullscreen_button.pack(pady=12, padx=10)
 
 # logo
-image_light = Image.open('graphics/menageriet_logo.png')
+image_path = resource_path('graphics/menageriet_logo.png')
+image_light = Image.open(image_path)
 #image_dark = Image.open('menageriet_logo_dark.png')
 logo = ctk.CTkImage(light_image=image_light, dark_image=image_light, size=(200, 200))
 
