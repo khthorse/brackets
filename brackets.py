@@ -9,43 +9,48 @@ from pathlib import Path
 
 class TournamentModel:
     def __init__(self):
+        self.loaded_teams = []  # [{"name": ..., "logo": ...}, ...]
         self.teams = []
         self.rounds = []  # Hver runde er en liste med kamper
 
-    def build_bracket(self, teams):
-        teams_shuffled = teams[:]
+    def build_bracket(self, teams_input):
+
+        team_objs = []
+        for item in teams_input:
+            if isinstance(item, dict):
+                name = str(item.get("name", "")).strip()
+                logo = item.get("logo")
+            else:
+                name = str(item).strip()
+                logo = None
+            if not name:
+                continue
+            team_objs.append({"name": name, "logo": logo})
+
+        teams_shuffled = team_objs[:]
         random.shuffle(teams_shuffled)
-        self.teams = [{"name": team, "logo": None} for team in teams_shuffled]  # lagres med logo=None foreløpig
+        self.teams = teams_shuffled
+
         n = len(self.teams)
-        power = 2 ** math.ceil(math.log2(n))
-        padded_teams = self.teams + [{"name": "BYE", "logo": None}] * (power - n)
+        size = 1
+        while size < n:
+            size *= 2
 
-        round1 = []
-        for i in range(0, len(padded_teams), 2):
-            match = {
-                "team1": padded_teams[i],
-                "team2": padded_teams[i + 1],
-                "winner": None,
-                "start_time": None,
-                "played":False
-            }
-            round1.append(match)
-        self.rounds = [round1]
+        seeds = self.teams + [None] * (size - n)
+        first_round = []
+        for i in range(0, size, 2):
+            first_round.append({"team1": seeds[i], "team2": seeds[i+1], "winner": None, "start_time": None})
+        self.rounds = [first_round]
 
-        total_rounds = int(math.log2(power))
-        for r in range(2, total_rounds + 1):
-            num_matches = power // (2 ** r)
+        rsize = size // 2
+        while rsize >= 1:
             matches = []
-            for i in range(num_matches):
-                match = {
-                    "team1": None,
-                    "team2": None,
-                    "winner": None,
-                    "start_time": None,
-                    "played":False
-                }
-                matches.append(match)
-            self.rounds.append(matches)
+            for _ in range(rsize // 2):
+                matches.append({"team1": None, "team2": None, "winner": None, "start_time": None})
+            if rsize // 2 > 0:
+                self.rounds.append(matches)
+            rsize //= 2
+
 
     def set_winner(self, round_index, match_index, winner):
         self.rounds[round_index][match_index]["winner"] = winner
@@ -457,25 +462,14 @@ class ControlWindow(ctk.CTkToplevel):
         team_entry_label.pack(pady=5)
         self.team_text = tk.Text(self, height=20, width=60)
         self.team_text.pack(pady=5)
-        self.team_text.insert("1.0", "Ania's barn\n"
-                                    "Oslo4ever\n"
-                                    "menahoes\n"
-                                    "Pizza Beerpong Club\n"
-                                    "Old but gold\n"
-                                    "Styrepils???\n"
-                                    "Mario’s Sjel\n"
-                                    "Brygg Bitches\n"
-                                    "Just some girls 💅\n"
-                                    "2 voksne jenter\n"
-                                    "Vicious Vikings\n"
-                                    "Det Schmeller\n"
-                                    "BIEEER🍻\n"
-                                    "DEMO\n"
-                                    "tja\n"
-                                    "The Crusaders\n")  #Lag 1\nLag 2\nLag 3\nLag 4\nLag 5\nLag 6\nLag 7\nLag 8\nLag 9\nLag 10\nLag 11\nLag 12\nLag 13\nLag 14\nLag 15\nLag 16
+        self.team_text.insert("1.0", "Lag 1\nLag 2\nLag 3\nLag 4\nLag 5\nLag 6\nLag 7\nLag 8\nLag 9\nLag 10\nLag 11\nLag 12\nLag 13\nLag 14\nLag 15\nLag 16")  
         
         set_teams_button = ctk.CTkButton(self, text="Bygg Brakett", command=self.build_bracket)
         set_teams_button.pack(pady=5)
+
+        load_from_file_btn = ctk.CTkButton(self, text="Last lag fra fil...", command=self.load_teams_from_file)
+        load_from_file_btn.pack(pady=5)
+
         
         self.logo_switch = False
         load_logo_checkbox = ctk.CTkCheckBox(self, text="Legg til laglogoer", command=self.toggle_load_logo)
@@ -581,6 +575,97 @@ class ControlWindow(ctk.CTkToplevel):
         e1.focus()
         top.wait_window()
 
+
+    def _parse_team_file(self, filepath: str):
+        """Leser fil med lag og valgfrie logostier. Støtter CSV (name,logo) og linjer med , ; | TAB."""
+        teams = []
+        base = Path(filepath).parent
+
+        def split_smart(line: str):
+            # Prøv CSV først
+            try:
+                for row in csv.reader([line]):
+                    return [s.strip() for s in row]
+            except Exception:
+                pass
+            # Fallback: manuell splitting på vanlige delimitere
+            for delim in [",", ";", "|", "\t"]:
+                if delim in line:
+                    return [s.strip() for s in line.split(delim)]
+            return [line.strip()]
+
+        with open(filepath, "r", encoding="utf-8-sig") as f:
+            lines = f.read().splitlines()
+
+        # Hopp over header hvis den ser ut som "name,logo"
+        if lines and ("name" in lines[0].lower() and "logo" in lines[0].lower()):
+            lines = lines[1:]
+
+        for raw in lines:
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = split_smart(line)
+            if len(parts) == 1:
+                name = parts[0]
+                logo = None
+            else:
+                name, logo = parts[0], (parts[1] or None)
+
+            if not name:
+                continue
+
+            # Normaliser/absolutt sti til logo hvis oppgitt
+            if logo:
+                p = Path(logo).expanduser()
+                if not p.is_absolute():
+                    p = (base / p).resolve()
+                logo = str(p)
+                # (valgfritt) ikke krav: sjekk om fila finnes
+                # if not Path(logo).is_file(): logo = None
+
+            teams.append({"name": name, "logo": logo})
+        return teams
+
+    def _teams_from_textbox(self):
+        """Fallback når bruker har skrevet navn i tekstfeltet – ingen logo."""
+        names = [ln.strip() for ln in self.team_text.get("1.0", "end").splitlines() if ln.strip()]
+        return [{"name": n, "logo": None} for n in names]
+    
+    def load_teams_from_file(self):
+        path = fd.askopenfilename(
+            title="Velg lag-fil",
+            filetypes=[("CSV/Tekst", "*.csv *.txt *.tsv"), ("Alle filer", "*.*")]
+        )
+        if not path:
+            return
+        try:
+            # Les inn og lagre i self.teams
+            self.teams = self._parse_team_file(path)
+            if not self.teams:
+                raise ValueError("Fant ingen lag i fila.")
+
+            # Vis bare navnene i tekstboksen som en “preview”
+            self.team_text.delete("1.0", "end")
+            self.team_text.insert("1.0", "\n".join(t["name"] for t in self.teams))
+
+            # Liten bekreftelse
+            ok = ctk.CTkToplevel(self)
+            ok.title("Lag lastet")
+            ctk.CTkLabel(ok, text=f"Lastet {len(self.teams)} lag fra fil.").pack(padx=20, pady=14)
+            try:
+                # Hvis du har plasseringshjelperen fra tidligere:
+                self._place_dialog_over(ok, width=260, height=90)
+            except Exception:
+                pass
+        except Exception as e:
+            err = ctk.CTkToplevel(self)
+            err.title("Feil")
+            ctk.CTkLabel(err, text=f"Kunne ikke lese filen.\n{e}").pack(padx=20, pady=20)
+            try:
+                self._place_dialog_over(err, width=320, height=120)
+            except Exception:
+                pass
 
 
 
@@ -844,7 +929,10 @@ class ControlWindow(ctk.CTkToplevel):
     
 
     def fill_team_list(self):
+        self.teams = []  # <-- viktig: ikke akkumulér
         team_names = self.team_text.get("1.0", "end").strip().splitlines()
+        ...
+
         
         logo_path = False
         for name in team_names:
@@ -853,15 +941,22 @@ class ControlWindow(ctk.CTkToplevel):
             self.teams.append({"name": name, "logo": logo_path if logo_path else None})
 
     def build_bracket(self):
-        self.fill_team_list()
+        # Hvis vi ikke har lastet lag fra fil, les fra tekstboksen (og ev. spør om logo)
+        if not self.teams:
+            self.fill_team_list()
+
+        # Bygg turnering med bare navn (som før)
         self.tournament_model.build_bracket([team["name"] for team in self.teams])
 
-        # Lagre logoene separat
-        for i, team in enumerate(self.tournament_model.teams):
-            team["logo"] = self.teams[i]["logo"]
+        # Koble logoer til de shufflade teamene ETTER bygging – ved navn (ikke indeks)
+        logo_by_name = {t["name"]: t.get("logo") for t in self.teams}
+        for t in self.tournament_model.teams:
+            t["logo"] = logo_by_name.get(t["name"])
 
         self.draw_match_controls()
         self.bracket_canvas.refresh()
+
+
 
 
     def draw_match_controls(self):

@@ -71,7 +71,7 @@ timer2 = Timer(master=timer_frame, initial_time=60*15, timer_label='Bord 2')
 #fullscreen_button.pack(pady=12, padx=10)
 
 # logo
-image_light = Image.open('menageriet_logo.png')
+image_light = Image.open('graphics/menageriet_logo.png')
 #image_dark = Image.open('menageriet_logo_dark.png')
 logo = ctk.CTkImage(light_image=image_light, dark_image=image_light, size=(200, 200))
 
