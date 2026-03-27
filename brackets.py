@@ -1,343 +1,270 @@
+
+import sys
+import math
+import os, csv
+
 import customtkinter as ctk
-from PIL import Image, ImageTk
 import tkinter.filedialog as fd
 import tkinter as tk
-import math
-import random
-import os, csv
+
+from PIL import Image, ImageTk
 from pathlib import Path
 
-class TournamentModel:
-    def __init__(self):
-        self.loaded_teams = []  # [{"name": ..., "logo": ...}, ...]
-        self.teams = []
-        self.rounds = []  # Hver runde er en liste med kamper
-
-    def build_bracket(self, teams_input):
-
-        team_objs = []
-        for item in teams_input:
-            if isinstance(item, dict):
-                name = str(item.get("name", "")).strip()
-                logo = item.get("logo")
-            else:
-                name = str(item).strip()
-                logo = None
-            if not name:
-                continue
-            team_objs.append({"name": name, "logo": logo})
-
-        teams_shuffled = team_objs[:]
-        random.shuffle(teams_shuffled)
-        self.teams = teams_shuffled
-
-        n = len(self.teams)
-        size = 1
-        while size < n:
-            size *= 2
-
-        seeds = self.teams + [None] * (size - n)
-        first_round = []
-        for i in range(0, size, 2):
-            first_round.append({"team1": seeds[i], "team2": seeds[i+1], "winner": None, "start_time": None})
-        self.rounds = [first_round]
-
-        rsize = size // 2
-        while rsize >= 1:
-            matches = []
-            for _ in range(rsize // 2):
-                matches.append({"team1": None, "team2": None, "winner": None, "start_time": None})
-            if rsize // 2 > 0:
-                self.rounds.append(matches)
-            rsize //= 2
-
-
-    def set_winner(self, round_index, match_index, winner):
-        self.rounds[round_index][match_index]["winner"] = winner
-        if round_index + 1 < len(self.rounds):
-            next_match_index = match_index // 2
-            match = self.rounds[round_index + 1][next_match_index]
-            if match["team1"] is None:
-                match["team1"] = winner
-            elif match["team2"] is None:
-                match["team2"] = winner
-
-    def set_start_time(self, round_index, match_index, start_time):
-        self.rounds[round_index][match_index]["start_time"] = start_time
-
-    def set_match_teams(self, round_index, match_index, team1, team2):
-        self.rounds[round_index][match_index]["team1"] = team1
-        self.rounds[round_index][match_index]["team2"] = team2
-        self.rounds[round_index][match_index]["winner"] = None
-        self.rounds[round_index][match_index]["start_time"] = None
-
-    def get_rounds(self):
-        return self.rounds
-
-class GroupStageModel:
-    def __init__(self, teams):
-        self.teams = []
-        for team in teams:
-            self.teams.append({
-                "name": team["name"],
-                "logo": team.get("logo"),
-                "wins": 0,
-                "cups_hit": 0,
-                "cups_missed": 0,
-                "total_cups_diff": 0
-            })
-        self.matches = []
-
-    def generate_matches(self):
-        teams_shuffled = self.teams[:]
-        random.shuffle(teams_shuffled)
-        
-        n = len(teams_shuffled)
-        assert n % 2 == 0, "Antall lag bør være partall for dette oppsettet."
-        
-        # Sørg for at ingen møter samme motstander to ganger
-        round1 = []
-        for i in range(0, n, 2):
-            round1.append({"team1": teams_shuffled[i], "team2": teams_shuffled[i+1], 
-                           "team1_cups_left": None, "team2_cups_left": None, "time": None, "played":False})
-
-        # Lag en ny tilfeldig rekkefølge og sørg for unike kamper
-        round2 = []
-        valid_round = False
-        while not valid_round:
-            random.shuffle(teams_shuffled)
-            round2 = [{"team1": teams_shuffled[i], "team2": teams_shuffled[i+1],
-                       "team1_cups_left": None, "team2_cups_left": None, "time": None, "played":False}
-                      for i in range(0, n, 2)]
-            # sjekk at ingen par går igjen fra runde 1
-            valid_round = all(
-                set((m["team1"]["name"], m["team2"]["name"])) not in 
-                [set((m1["team1"]["name"], m1["team2"]["name"])) for m1 in round1]
-                for m in round2
-            )
-
-        self.matches = round1 + round2
-
-    def update_match_result(self, match_index, cups_left_team1, cups_left_team2, winner):
-        match = self.matches[match_index]
-
-        # Rull tilbake gammelt resultat hvis kampen var spilt
-        if match.get("played"):
-            prev_c1 = match.get("team1_cups_left")
-            prev_c2 = match.get("team2_cups_left")
-            prev_w  = match.get("winner")
-            if prev_c1 is not None and prev_c2 is not None and prev_w in (1, 2):
-                self._apply_result(match, prev_c1, prev_c2, prev_w, sign=-1)
-
-        # Lagre nytt resultat og påfør
-        match["team1_cups_left"] = cups_left_team1
-        match["team2_cups_left"] = cups_left_team2
-        match["winner"] = winner
-        self._apply_result(match, cups_left_team1, cups_left_team2, winner, sign=+1)
-        match["played"] = True
-
-
-    def standings(self):
-        return sorted(self.teams, key=lambda x: (
-            -x["wins"], -x["cups_hit"], -x["total_cups_diff"]
-        ))
-    
-    def _apply_result(self, match, cups_left_team1, cups_left_team2, winner, sign=+1):
-        """Påfør (sign=+1) eller rull tilbake (sign=-1) et resultat i tabellen."""
-        team1 = next(t for t in self.teams if t["name"] == match["team1"]["name"])
-        team2 = next(t for t in self.teams if t["name"] == match["team2"]["name"])
-
-        cups_hit_team1 = 10 - cups_left_team2
-        cups_hit_team2 = 10 - cups_left_team1
-
-        # Poeng
-        if cups_left_team1 != cups_left_team2:
-            if cups_left_team1 > cups_left_team2 and winner == 1:
-                team1['wins'] += 2 * sign
-            elif cups_left_team1 < cups_left_team2 and winner == 2:
-                team2['wins'] += 2 * sign
-            else:
-                raise ValueError("Ugyldig kombinasjon av kopper/vinner")
-        else:
-            team1['wins'] += 1 * sign
-            team2['wins'] += 1 * sign
-            if winner == 1 and cups_left_team1 == cups_hit_team2:
-                team1['wins'] += 1 * sign
-            elif winner == 2 and cups_left_team1 == cups_hit_team2:
-                team2['wins'] += 1 * sign
-            else:
-                raise ValueError("Ugyldig tie-break kombinasjon")
-
-        # Statistikk
-        team1["cups_hit"]    += cups_hit_team1 * sign
-        team1["cups_missed"] += cups_hit_team2 * sign
-        team1["total_cups_diff"] = team1["cups_hit"] - team1["cups_missed"]
-
-        team2["cups_hit"]    += cups_hit_team2 * sign
-        team2["cups_missed"] += cups_hit_team1 * sign
-        team2["total_cups_diff"] = team2["cups_hit"] - team2["cups_missed"]
-
-    def clear_match_result(self, match_index):
-        match = self.matches[match_index]
-        if not match.get("played"):
-            return
-        prev_c1 = match.get("team1_cups_left")
-        prev_c2 = match.get("team2_cups_left")
-        prev_w  = match.get("winner")
-        if prev_c1 is not None and prev_c2 is not None and prev_w in (1, 2):
-            self._apply_result(match, prev_c1, prev_c2, prev_w, sign=-1)
-
-        match["team1_cups_left"] = None
-        match["team2_cups_left"] = None
-        match["winner"] = None
-        match["played"] = False
-
+from models import TournamentModel, GroupStageModel, Match, Team
 
 
 class TournamentBracketCanvas(ctk.CTkFrame):
     """
     Hovedvinduet som viser braketten på en Canvas i pyramideform.
     Kampene tegnes som rektangler med linjer som forbinder rundene.
-    Linjene trekkes i tre segmenter: horisontalt fra barnets boks, så vertikalt, og horisontalt til den nye boksen.
+    Linjene trekkes i tre segmenter: horisontalt fra barnets boks, så vertikalt,
+    og horisontalt til den nye boksen.
     """
     def __init__(self, master, tournament_model, *args, **kwargs):
-        super().__init__(master, *args, border_width=0, fg_color='#2b2b2b', **kwargs)
+        super().__init__(master, *args, border_width=0, fg_color="#2b2b2b", **kwargs)
         self.tournament_model = tournament_model
         self.pack(fill="both", expand=True)
+
         canvas_bg = "#2B2B2B"
-            
         self.canvas = tk.Canvas(self, bg=canvas_bg, highlightthickness=0, bd=0)
         self.canvas.pack(fill="both", expand=True)
         self.canvas.bind("<Configure>", lambda event: self.draw_bracket())
 
-        self.images = []  # Holder referanser til bilder
-
+        self.images = []
         self.draw_bracket()
-        
+
     def show_winner_popup(self, winner):
         canvas_width = self.canvas.winfo_width()
         canvas_height = self.canvas.winfo_height()
-        self.canvas.delete('all')
-        self.canvas.create_text(canvas_width/2, canvas_height/2 - 300, text= f'🏆 Vinner av turnering! 🏆', font=('Arial', 60), fill='white')
-        self.canvas.create_text(canvas_width/2, canvas_height/2 - 200, text= f'{winner['name']}', font=('Arial', 60), fill='white')
-        if winner["logo"]:
+
+        self.canvas.delete("all")
+        self.canvas.create_text(
+            canvas_width / 2,
+            canvas_height / 2 - 300,
+            text="🏆 Vinner av turnering! 🏆",
+            font=("Arial", 60),
+            fill="white",
+        )
+        self.canvas.create_text(
+            canvas_width / 2,
+            canvas_height / 2 - 200,
+            text=winner.name,
+            font=("Arial", 60),
+            fill="white",
+        )
+
+        if winner.logo:
             try:
-                img = Image.open(winner["logo"])
-                img.thumbnail((canvas_height/3, canvas_height/3), Image.LANCZOS)
+                img = Image.open(winner.logo)
+                img.thumbnail((canvas_height / 3, canvas_height / 3), Image.LANCZOS)
                 logo_img = ImageTk.PhotoImage(img)
-                self.canvas.create_image(canvas_width / 2, canvas_height/2 + canvas_height/6, image=logo_img)
+                self.canvas.create_image(
+                    canvas_width / 2,
+                    canvas_height / 2 + canvas_height / 6,
+                    image=logo_img,
+                )
                 self.images.append(logo_img)
             except Exception as e:
                 print(f"Feil ved lasting av logo: {e}")
 
     def show_group_stage(self, group_stage_model):
-        self.canvas.delete("all")  # tøm eksisterende brackets
+        self.canvas.delete("all")
         self.images.clear()
-        
+
         standings = group_stage_model.standings()
         matches = group_stage_model.matches
 
         canvas_width = self.canvas.winfo_width()
         canvas_height = self.canvas.winfo_height()
-        
 
-        # Vis tittel
-        self.canvas.create_text(canvas_width / 2, 30, text="Gruppespill", font=("Arial", 30), fill="White")
+        self.canvas.create_text(
+            canvas_width / 2, 30, text="Gruppespill", font=("Arial", 30), fill="white"
+        )
 
-        # Verdier for bokser som brukes i tabellene
         start_y = 80
         box_pady = 5
         box_padx = 10
-        box_height = ((canvas_height-start_y-2*box_pady)/len(standings))
-        box_width = (canvas_width/2) - 2*box_padx
-        box2_width = (canvas_width*4/10) - 2*box_padx
-        thumbnail_size = box_height-4*box_pady
-        
-        # Vis tabellen til venstre
-        
-        self.canvas.create_text(canvas_width / 4, start_y - 6*box_pady, text="Tabell", font=("Arial", 24), fill="white")
+        box_height = (canvas_height - start_y - 2 * box_pady) / len(standings)
+        box_width = (canvas_width / 2) - 2 * box_padx
+        box2_width = (canvas_width * 4 / 10) - 2 * box_padx
+        thumbnail_size = box_height - 4 * box_pady
+
+        self.canvas.create_text(
+            canvas_width / 4,
+            start_y - 6 * box_pady,
+            text="Tabell",
+            font=("Arial", 24),
+            fill="white",
+        )
+
         for idx, team in enumerate(standings, start=1):
-            
-            box_x0, box_y0 = box_padx, start_y + box_pady + (idx-1)*box_height
-            box_x1, box_y1 = box_width - box_padx, box_y0-box_pady + box_height
-            
-            self.canvas.create_rectangle(box_x0, box_y0, box_x1, box_y1, fill='#333333')
-            text_ypos = box_y1 + box_pady - box_height/2
-            teamname_x = box_width/4
-            results_x = 3*box_width/4
-            fontsize = int(box_height/4)
-            
-            self.canvas.create_text(teamname_x, text_ypos, text=f'{idx}. {team['name']}', font=('Arial', fontsize), fill='white', anchor='w')
-            self.canvas.create_text(results_x, text_ypos, text=f'V    |    T    |    D\n{team['wins']}    |    {team['cups_hit']}    |    {team['total_cups_diff']}', font=('Arial', fontsize), fill='white', justify='left')
+            box_x0, box_y0 = box_padx, start_y + box_pady + (idx - 1) * box_height
+            box_x1, box_y1 = box_width - box_padx, box_y0 - box_pady + box_height
 
-            
-            # Logoer
-            if team["logo"]:
+            self.canvas.create_rectangle(box_x0, box_y0, box_x1, box_y1, fill="#333333")
+            text_ypos = box_y1 + box_pady - box_height / 2
+            teamname_x = box_width / 4
+            results_x = 3 * box_width / 4
+            fontsize = int(box_height / 4)
+
+            self.canvas.create_text(
+                teamname_x,
+                text_ypos,
+                text=f"{idx}. {team.name}",
+                font=("Arial", fontsize),
+                fill="white",
+                anchor="w",
+            )
+            self.canvas.create_text(
+                results_x,
+                text_ypos,
+                text=f"V    |    T    |    D\n{team.wins}    |    {team.cups_hit}    |    {team.total_cups_diff}",
+                font=("Arial", fontsize),
+                fill="white",
+                justify="left",
+            )
+
+            if team.logo:
                 try:
-                    img = Image.open(team["logo"])
+                    img = Image.open(team.logo)
                     img.thumbnail((thumbnail_size, thumbnail_size), Image.LANCZOS)
                     logo_img = ImageTk.PhotoImage(img)
-                    self.canvas.create_image(box_width/8, text_ypos-box_pady/2, image=logo_img)
+                    self.canvas.create_image(box_width / 8, text_ypos - box_pady / 2, image=logo_img)
                     self.images.append(logo_img)
                 except Exception as e:
                     print(f"Feil ved lasting av logo: {e}")
 
-        # Vis kamper til høyre
         matches_start_y = 80
-        matches_start_x = box_width + 1/2*box_width + 2*box_padx - box2_width/2
-        
-        
-        self.canvas.create_text(3 * canvas_width / 4, matches_start_y - 6*box_pady, text="Kamper", font=("Arial", 24), fill="white")
-        for idx, match in enumerate(matches, start=1):
-            
-            box_x0, box_y0 = matches_start_x + box_padx, start_y + box_pady + (idx-1)*box_height
-            box_x1, box_y1 = matches_start_x + box2_width - box_padx, box_y0-box_pady + box_height
-            
-            self.canvas.create_rectangle(box_x0, box_y0, box_x1, box_y1, fill='#333333')
-            time_ypos = box_y1 + box_pady - box_height/2 - box_height/4
-            text_ypos = box_y1 + box_pady - box_height/2
-            teamname1_x = matches_start_x + box2_width/4 + thumbnail_size
-            teamname2_x = matches_start_x + 3*box2_width/4 - thumbnail_size
-            
-            if match['time']:
-                if match['played']:
-                    self.canvas.create_text(teamname1_x, text_ypos + box_height/6, text=f'{match['team1']['name']}', font=('Arial overstrike', int(fontsize*3/4)), fill='white', justify='left')
-                    self.canvas.create_text(matches_start_x + box2_width/2, text_ypos + box_height/6, text=f'vs', font=('Arial', fontsize), fill='white')
-                    self.canvas.create_text(teamname2_x, text_ypos + box_height/6, text=f'{match['team2']['name']}', font=('Arial', int(fontsize*3/4)), fill='white', justify='right')
-                else:
-                    self.canvas.create_text(teamname1_x, text_ypos + box_height/6, text=f'{match['team1']['name']}', font=('Arial', int(fontsize*3/4)), fill='white', justify='left')
-                    self.canvas.create_text(matches_start_x + box2_width/2, text_ypos + box_height/6, text=f'vs', font=('Arial', fontsize), fill='white')
-                    self.canvas.create_text(teamname2_x, text_ypos + box_height/6, text=f'{match['team2']['name']}', font=('Arial', int(fontsize*3/4)), fill='white', justify='right')
+        matches_start_x = box_width + 0.5 * box_width + 2 * box_padx - box2_width / 2
 
-                # Legg inn tidspunkt
-                self.canvas.create_text(matches_start_x + box2_width/2, time_ypos, text=f'Starter: {match['time']}', font=('Arial', int(fontsize*4/5)), fill='white')
-                
+        self.canvas.create_text(
+            3 * canvas_width / 4,
+            matches_start_y - 6 * box_pady,
+            text="Kamper",
+            font=("Arial", 24),
+            fill="white",
+        )
+
+        for idx, match in enumerate(matches, start=1):
+            box_x0, box_y0 = matches_start_x + box_padx, start_y + box_pady + (idx - 1) * box_height
+            box_x1, box_y1 = matches_start_x + box2_width - box_padx, box_y0 - box_pady + box_height
+
+            self.canvas.create_rectangle(box_x0, box_y0, box_x1, box_y1, fill="#333333")
+
+            time_ypos = box_y1 + box_pady - box_height / 2 - box_height / 4
+            text_ypos = box_y1 + box_pady - box_height / 2
+            teamname1_x = matches_start_x + box2_width / 4 + thumbnail_size
+            teamname2_x = matches_start_x + 3 * box2_width / 4 - thumbnail_size
+
+            team1_name = match.team1.name if match.team1 else "TBD"
+            team2_name = match.team2.name if match.team2 else "TBD"
+
+            if match.time:
+                if match.played:
+                    self.canvas.create_text(
+                        teamname1_x,
+                        text_ypos + box_height / 6,
+                        text=team1_name,
+                        font=("Arial overstrike", int(fontsize * 3 / 4)),
+                        fill="white",
+                        justify="left",
+                    )
+                    self.canvas.create_text(
+                        matches_start_x + box2_width / 2,
+                        text_ypos + box_height / 6,
+                        text="vs",
+                        font=("Arial", fontsize),
+                        fill="white",
+                    )
+                    self.canvas.create_text(
+                        teamname2_x,
+                        text_ypos + box_height / 6,
+                        text=team2_name,
+                        font=("Arial", int(fontsize * 3 / 4)),
+                        fill="white",
+                        justify="right",
+                    )
+                else:
+                    self.canvas.create_text(
+                        teamname1_x,
+                        text_ypos + box_height / 6,
+                        text=team1_name,
+                        font=("Arial", int(fontsize * 3 / 4)),
+                        fill="white",
+                        justify="left",
+                    )
+                    self.canvas.create_text(
+                        matches_start_x + box2_width / 2,
+                        text_ypos + box_height / 6,
+                        text="vs",
+                        font=("Arial", fontsize),
+                        fill="white",
+                    )
+                    self.canvas.create_text(
+                        teamname2_x,
+                        text_ypos + box_height / 6,
+                        text=team2_name,
+                        font=("Arial", int(fontsize * 3 / 4)),
+                        fill="white",
+                        justify="right",
+                    )
+
+                self.canvas.create_text(
+                    matches_start_x + box2_width / 2,
+                    time_ypos,
+                    text=f"Starter: {match.time}",
+                    font=("Arial", int(fontsize * 4 / 5)),
+                    fill="white",
+                )
             else:
-                # Tegn kamper
-                self.canvas.create_text(teamname1_x, text_ypos, text=f'{match['team1']['name']}', font=('Arial', int(fontsize*3/4)), fill='white', justify='left')
-                self.canvas.create_text(matches_start_x + box2_width/2, text_ypos, text=f'vs', font=('Arial', fontsize), fill='white')
-                self.canvas.create_text(teamname2_x, text_ypos, text=f'{match['team2']['name']}', font=('Arial', int(fontsize*3/4)), fill='white', justify='right')
-                    
-                    
-                    
-                    
-            # Logoer
-            if match['team1']['logo']:
+                self.canvas.create_text(
+                    teamname1_x,
+                    text_ypos,
+                    text=team1_name,
+                    font=("Arial", int(fontsize * 3 / 4)),
+                    fill="white",
+                    justify="left",
+                )
+                self.canvas.create_text(
+                    matches_start_x + box2_width / 2,
+                    text_ypos,
+                    text="vs",
+                    font=("Arial", fontsize),
+                    fill="white",
+                )
+                self.canvas.create_text(
+                    teamname2_x,
+                    text_ypos,
+                    text=team2_name,
+                    font=("Arial", int(fontsize * 3 / 4)),
+                    fill="white",
+                    justify="right",
+                )
+
+            if match.team1 and match.team1.logo:
                 try:
-                    img = Image.open(match['team1']['logo'])
+                    img = Image.open(match.team1.logo)
                     img.thumbnail((thumbnail_size, thumbnail_size), Image.LANCZOS)
                     logo_img = ImageTk.PhotoImage(img)
-                    self.canvas.create_image(matches_start_x + box2_width/8, text_ypos-box_pady/2, image=logo_img)
+                    self.canvas.create_image(
+                        matches_start_x + box2_width / 8,
+                        text_ypos - box_pady / 2,
+                        image=logo_img,
+                    )
                     self.images.append(logo_img)
                 except Exception as e:
                     print(f"Feil ved lasting av logo: {e}")
-            
-            if match['team2']['logo']:
+
+            if match.team2 and match.team2.logo:
                 try:
-                    img = Image.open(match['team2']['logo'])
+                    img = Image.open(match.team2.logo)
                     img.thumbnail((thumbnail_size, thumbnail_size), Image.LANCZOS)
                     logo_img = ImageTk.PhotoImage(img)
-                    self.canvas.create_image(matches_start_x + box2_width*7/8, text_ypos-box_pady/2, image=logo_img)
+                    self.canvas.create_image(
+                        matches_start_x + box2_width * 7 / 8,
+                        text_ypos - box_pady / 2,
+                        image=logo_img,
+                    )
                     self.images.append(logo_img)
                 except Exception as e:
                     print(f"Feil ved lasting av logo: {e}")
@@ -345,12 +272,15 @@ class TournamentBracketCanvas(ctk.CTkFrame):
     def draw_bracket(self):
         self.canvas.delete("all")
         rounds = self.tournament_model.get_rounds()
+
         if not rounds:
             return
+
         num_rounds = len(rounds)
 
         canvas_width = self.canvas.winfo_width()
         canvas_height = self.canvas.winfo_height()
+
         left_margin = 50
         right_margin = 50
         top_margin = 50
@@ -359,15 +289,20 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         box_width = 300
         box_height = 80
 
-        horizontal_spacing = ((canvas_width - left_margin - right_margin - num_rounds * box_width) /
-                              (num_rounds - 1)) if num_rounds > 1 else 0
+        horizontal_spacing = (
+            (canvas_width - left_margin - right_margin - num_rounds * box_width) / (num_rounds - 1)
+            if num_rounds > 1 else 0
+        )
 
         num_matches_r0 = len(rounds[0])
-        vertical_spacing = ((canvas_height - top_margin - bottom_margin - num_matches_r0 * box_height) /
-                            (num_matches_r0 - 1)) if num_matches_r0 > 1 else 0
+        vertical_spacing = (
+            (canvas_height - top_margin - bottom_margin - num_matches_r0 * box_height) / (num_matches_r0 - 1)
+            if num_matches_r0 > 1 else 0
+        )
 
         positions = []
         round0_positions = []
+
         for i in range(num_matches_r0):
             y = top_margin + i * (box_height + vertical_spacing) + box_height / 2
             x = left_margin + box_width / 2
@@ -378,46 +313,51 @@ class TournamentBracketCanvas(ctk.CTkFrame):
             prev_positions = positions[r - 1]
             current_positions = []
             num_matches = len(rounds[r])
+
             for i in range(num_matches):
                 if 2 * i + 1 < len(prev_positions):
                     y = (prev_positions[2 * i][1] + prev_positions[2 * i + 1][1]) / 2
                 else:
                     y = prev_positions[2 * i][1]
+
                 x = left_margin + r * (box_width + horizontal_spacing) + box_width / 2
                 current_positions.append((x, y))
+
             positions.append(current_positions)
 
         self.images.clear()
+
         for r, round_matches in enumerate(rounds):
             for i, match in enumerate(round_matches):
-                (x, y) = positions[r][i]
+                x, y = positions[r][i]
                 x0, y0 = x - box_width / 2, y - box_height / 2
                 x1, y1 = x + box_width / 2, y + box_height / 2
+
                 self.canvas.create_rectangle(x0, y0, x1, y1, fill="gray20", outline="black")
 
-                start_text = f"Starter: {match['start_time']}" if match["start_time"] else ""
-                #self.canvas.create_text(x, y0 - 20, text=start_text, font=("Helvetica", 12), fill="white") Draw starttime above match box
-
-                team1_name = match["team1"]["name"] if match["team1"] else "TBD"
-                team2_name = match["team2"]["name"] if match["team2"] else "TBD"
+                team1_name = match.team1.name if match.team1 else "TBD"
+                team2_name = match.team2.name if match.team2 else "TBD"
                 text = f"{team1_name}\nvs\n{team2_name}"
-                self.canvas.create_text(x, y, text=text, font=("Helvetica", 16), fill="white", justify='center')
 
-                # Tegne logoer
+                self.canvas.create_text(
+                    x, y, text=text, font=("Helvetica", 16), fill="white", justify="center"
+                )
+
                 logo_size = 40
                 padding = 5
-                if match["team1"] and match["team1"]["logo"]:
+
+                if match.team1 and match.team1.logo:
                     try:
-                        img1 = Image.open(match["team1"]["logo"]).resize((logo_size, logo_size))
+                        img1 = Image.open(match.team1.logo).resize((logo_size, logo_size))
                         img1_tk = ImageTk.PhotoImage(img1)
                         self.canvas.create_image(x0 + logo_size / 2 + padding, y, image=img1_tk)
                         self.images.append(img1_tk)
                     except Exception as e:
                         print(f"Feil ved lasting av logo for {team1_name}: {e}")
 
-                if match["team2"] and match["team2"]["logo"]:
+                if match.team2 and match.team2.logo:
                     try:
-                        img2 = Image.open(match["team2"]["logo"]).resize((logo_size, logo_size))
+                        img2 = Image.open(match.team2.logo).resize((logo_size, logo_size))
                         img2_tk = ImageTk.PhotoImage(img2)
                         self.canvas.create_image(x1 - logo_size / 2 - padding, y, image=img2_tk)
                         self.images.append(img2_tk)
@@ -427,6 +367,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
                 if r > 0:
                     child_index = i * 2
                     parent_x_left = x0
+
                     for idx_offset in [0, 1]:
                         child_idx = child_index + idx_offset
                         if child_idx < len(positions[r - 1]):
@@ -434,30 +375,27 @@ class TournamentBracketCanvas(ctk.CTkFrame):
                             child_x_right = child_x + box_width / 2
                             mid_x = (child_x_right + parent_x_left) / 2
 
-                            # Tegn forbindelseslinjer
                             self.canvas.create_line(child_x_right, child_y, mid_x, child_y, fill="white")
                             self.canvas.create_line(mid_x, child_y, mid_x, y, fill="white")
                             self.canvas.create_line(mid_x, y, parent_x_left, y, fill="white")
 
-                            # Hent kampen fra forrige runde og tegn starttid over den horisontale linjen
                             child_match = rounds[r - 1][child_idx]
-                            if child_match.get("start_time"):
+                            if child_match.start_time:
                                 text_x = (child_x_right + mid_x) / 2
                                 text_y = child_y - 14
                                 self.canvas.create_text(
                                     text_x,
                                     text_y,
-                                    text=f"Starter: {child_match['start_time']}",
+                                    text=f"Starter: {child_match.start_time}",
                                     font=("Helvetica", 11),
-                                    fill="white"
+                                    fill="white",
                                 )
 
         self.canvas.config(scrollregion=self.canvas.bbox("all"))
 
         last_round = rounds[-1]
-        if len(last_round) == 1 and last_round[0]["winner"]:
-            self.show_winner_popup(last_round[0]["winner"])
-            
+        if len(last_round) == 1 and last_round[0].winner:
+            self.show_winner_popup(last_round[0].winner)
 
     def refresh(self):
         self.draw_bracket()
@@ -473,70 +411,121 @@ class ControlWindow(ctk.CTkToplevel):
         self.bracket_canvas = bracket_canvas
         self.title("Kontrollvindu")
         self.geometry("1000x1200")
+
         team_entry_label = ctk.CTkLabel(self, text="Skriv inn lag (én per linje):")
         team_entry_label.pack(pady=5)
+
         self.team_text = tk.Text(self, height=20, width=60)
         self.team_text.pack(pady=5)
-        self.team_text.insert("1.0", "Lag 1\nLag 2\nLag 3\nLag 4\nLag 5\nLag 6\nLag 7\nLag 8\nLag 9\nLag 10\nLag 11\nLag 12\nLag 13\nLag 14\nLag 15\nLag 16")  
-        
+        self.team_text.insert(
+            "1.0",
+            "Lag 1\nLag 2\nLag 3\nLag 4\nLag 5\nLag 6\nLag 7\nLag 8\n"
+            "Lag 9\nLag 10\nLag 11\nLag 12\nLag 13\nLag 14\nLag 15\nLag 16"
+        )
+
         set_teams_button = ctk.CTkButton(self, text="Bygg Brakett", command=self.build_bracket)
         set_teams_button.pack(pady=5)
 
         load_from_file_btn = ctk.CTkButton(self, text="Last lag fra fil...", command=self.load_teams_from_file)
         load_from_file_btn.pack(pady=5)
 
-        
         self.logo_switch = False
         load_logo_checkbox = ctk.CTkCheckBox(self, text="Legg til laglogoer", command=self.toggle_load_logo)
         load_logo_checkbox.pack(pady=5)
-        
+
         self.start_group_button = ctk.CTkButton(self, text="Start Gruppespill", command=self.start_group_stage)
         self.start_bracket_button = ctk.CTkButton(self, text="Start Sluttspill", command=self.build_final_bracket)
-        self.start_bracket_button.pack_forget()  # skjul til å starte med
+        self.start_bracket_button.pack_forget()
 
         self.start_group_button.pack(pady=5)
+
         self.match_controls_frame = ctk.CTkScrollableFrame(self)
         self.match_controls_frame.pack(fill="both", expand=True, pady=10)
+
         self.draw_match_controls()
         self.teams = []
+        
+    def _make_dialog(self, title, width=350, height=220):
+        top = ctk.CTkToplevel(self)
+        top.title(title)
+        top.transient(self)
+        top.configure(fg_color="#2b2b2b")
+
+        top.geometry(f"{width}x{height}")
+        top.update_idletasks()
+        self.update_idletasks()
+
+        parent_x = self.winfo_rootx()
+        parent_y = self.winfo_rooty()
+        parent_w = self.winfo_width()
+        parent_h = self.winfo_height()
+
+        x = parent_x + (parent_w - width) // 2
+        y = parent_y + (parent_h - height) // 2
+        top.geometry(f"{width}x{height}+{x}+{y}")
+
+        top.wait_visibility()
+
+        self._set_dark_title_bar(top)
+
+        top.attributes("-topmost", True)
+        top.lift(self)
+        top.focus_force()
+        top.grab_set()
+        top.after(150, lambda: top.attributes("-topmost", False))
+
+        return top
+    
+    def _set_dark_title_bar(self, window):
+        try:
+            import ctypes
+
+            hwnd = ctypes.windll.user32.GetParent(window.winfo_id())
+            value = ctypes.c_int(1)
+
+            # Windows 11 / nyere Windows 10
+            DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                hwnd,
+                DWMWA_USE_IMMERSIVE_DARK_MODE,
+                ctypes.byref(value),
+                ctypes.sizeof(value)
+            )
+        except Exception:
+            pass
 
     def build_final_bracket(self):
         standings = self.group_stage_model.standings()
         top_4 = standings[:4]
-        self.tournament_model.build_bracket([team["name"] for team in top_4])
 
-        # lagre logoer og statistikk
-        for i, team in enumerate(self.tournament_model.teams):
-            team["logo"] = top_4[i]["logo"]
-            team["wins"] = top_4[i]["wins"]
-            team["cups_hit"] = top_4[i]["cups_hit"]
-            team["total_cups_diff"] = top_4[i]["total_cups_diff"]
+        self.tournament_model.build_bracket(top_4)
+
+        top_4_by_name = {team.name: team for team in top_4}
+        for team in self.tournament_model.teams:
+            src = top_4_by_name.get(team.name)
+            if src:
+                team.logo = src.logo
+                team.wins = src.wins
+                team.cups_hit = src.cups_hit
+                team.total_cups_diff = src.total_cups_diff
 
         self.bracket_canvas.refresh()
         self.draw_match_controls()
-        # skjul sluttspillknappen når brackets er laget
         self.start_bracket_button.pack_forget()
 
     def toggle_load_logo(self):
-        if self.logo_switch:
-            self.logo_switch = False
-        else:
-            self.logo_switch = True
-            
+        self.logo_switch = not self.logo_switch
+
     def check_allowed_cup_number(self, cups):
         if cups > 10 or cups < 0:
             raise ValueError
-            
-            
+
     def set_group_winner_popup(self, match_index, winner):
         match = self.group_stage_model.matches[match_index]
-        team1_name = match['team1']['name']
-        team2_name = match['team2']['name']
+        team1_name = match.team1.name
+        team2_name = match.team2.name
 
-        # Én dialog med to inputfelt
-        top = ctk.CTkToplevel(self)
-        top.title("Antall kopper igjen")
-        top.geometry("320x240")
+        top = self._make_dialog("Antall kopper igjen", width=320, height=420)
 
         ctk.CTkLabel(top, text=f"{team1_name} kopper igjen (0–10):").pack(pady=(12, 4))
         e1 = ctk.CTkEntry(top, width=120)
@@ -546,17 +535,17 @@ class ControlWindow(ctk.CTkToplevel):
         e2 = ctk.CTkEntry(top, width=120)
         e2.pack(pady=4)
 
-        # Feilmelding-etikett (vises ved behov)
         err_lbl = ctk.CTkLabel(top, text="", text_color="tomato")
         err_lbl.pack(pady=(6, 0))
 
-        # Hjelper: forsøk å lagre
         def do_save(event=None):
             c1_str = e1.get().strip()
             c2_str = e2.get().strip()
+
             if c1_str == "" or c2_str == "":
                 err_lbl.configure(text="Fyll inn begge feltene.")
                 return
+
             try:
                 c1 = int(c1_str)
                 c2 = int(c2_str)
@@ -565,7 +554,7 @@ class ControlWindow(ctk.CTkToplevel):
 
                 self.group_stage_model.update_match_result(match_index, c1, c2, winner)
                 self.bracket_canvas.show_group_stage(self.group_stage_model)
-                # (valgfritt) oppdater kontrollrader hvis du viser “rediger/angre”-knapper:
+
                 if hasattr(self, "draw_group_match_controls"):
                     self.draw_group_match_controls()
 
@@ -573,37 +562,31 @@ class ControlWindow(ctk.CTkToplevel):
             except ValueError:
                 err_lbl.configure(text="Ugyldig antall/kombo. Prøv igjen.")
 
-        # Knapper
         btn_row = ctk.CTkFrame(top)
         btn_row.pack(pady=12)
         ctk.CTkButton(btn_row, text="Avbryt", command=top.destroy).pack(side="left", padx=6)
         ctk.CTkButton(btn_row, text="Lagre", command=do_save).pack(side="left", padx=6)
 
-        # Enter = lagre, Esc = avbryt
         e1.bind("<Return>", do_save)
         e2.bind("<Return>", do_save)
         top.bind("<Escape>", lambda _e: top.destroy())
 
-        # Gjør dialogen modal
         top.grab_set()
         top.focus()
         e1.focus()
         top.wait_window()
 
-
     def _parse_team_file(self, filepath: str):
-        """Leser fil med lag og valgfrie logostier. Støtter CSV (name,logo) og linjer med , ; | TAB."""
         teams = []
         base = Path(filepath).parent
 
         def split_smart(line: str):
-            # Prøv CSV først
             try:
                 for row in csv.reader([line]):
                     return [s.strip() for s in row]
             except Exception:
                 pass
-            # Fallback: manuell splitting på vanlige delimitere
+
             for delim in [",", ";", "|", "\t"]:
                 if delim in line:
                     return [s.strip() for s in line.split(delim)]
@@ -612,7 +595,6 @@ class ControlWindow(ctk.CTkToplevel):
         with open(filepath, "r", encoding="utf-8-sig") as f:
             lines = f.read().splitlines()
 
-        # Hopp over header hvis den ser ut som "name,logo"
         if lines and ("name" in lines[0].lower() and "logo" in lines[0].lower()):
             lines = lines[1:]
 
@@ -620,6 +602,7 @@ class ControlWindow(ctk.CTkToplevel):
             line = raw.strip()
             if not line or line.startswith("#"):
                 continue
+
             parts = split_smart(line)
             if len(parts) == 1:
                 name = parts[0]
@@ -630,23 +613,20 @@ class ControlWindow(ctk.CTkToplevel):
             if not name:
                 continue
 
-            # Normaliser/absolutt sti til logo hvis oppgitt
             if logo:
                 p = Path(logo).expanduser()
                 if not p.is_absolute():
                     p = (base / p).resolve()
                 logo = str(p)
-                # (valgfritt) ikke krav: sjekk om fila finnes
-                # if not Path(logo).is_file(): logo = None
 
-            teams.append({"name": name, "logo": logo})
+            teams.append(Team(name=name, logo=logo))
+
         return teams
 
     def _teams_from_textbox(self):
-        """Fallback når bruker har skrevet navn i tekstfeltet – ingen logo."""
         names = [ln.strip() for ln in self.team_text.get("1.0", "end").splitlines() if ln.strip()]
-        return [{"name": n, "logo": None} for n in names]
-    
+        return [Team(name=n) for n in names]
+
     def load_teams_from_file(self):
         path = fd.askopenfilename(
             title="Velg lag-fil",
@@ -654,25 +634,23 @@ class ControlWindow(ctk.CTkToplevel):
         )
         if not path:
             return
+
         try:
-            # Les inn og lagre i self.teams
             self.teams = self._parse_team_file(path)
             if not self.teams:
                 raise ValueError("Fant ingen lag i fila.")
 
-            # Vis bare navnene i tekstboksen som en “preview”
             self.team_text.delete("1.0", "end")
-            self.team_text.insert("1.0", "\n".join(t["name"] for t in self.teams))
+            self.team_text.insert("1.0", "\n".join(t.name for t in self.teams))
 
-            # Liten bekreftelse
             ok = ctk.CTkToplevel(self)
             ok.title("Lag lastet")
             ctk.CTkLabel(ok, text=f"Lastet {len(self.teams)} lag fra fil.").pack(padx=20, pady=14)
             try:
-                # Hvis du har plasseringshjelperen fra tidligere:
                 self._place_dialog_over(ok, width=260, height=90)
             except Exception:
                 pass
+
         except Exception as e:
             err = ctk.CTkToplevel(self)
             err.title("Feil")
@@ -682,21 +660,14 @@ class ControlWindow(ctk.CTkToplevel):
             except Exception:
                 pass
 
-
-
     def start_group_stage(self):
-        # Sørg for at listen med teams fylles først
-        if not self.teams: 
+        if not self.teams:
             self.fill_team_list()
 
-        team_list = [{"name": team["name"], "logo": team["logo"]} for team in self.teams]
-        self.group_stage_model = GroupStageModel(team_list)
+        self.group_stage_model = GroupStageModel(self.teams)
         self.group_stage_model.generate_matches()
 
-        # Vis gruppespillet direkte i bracket_canvas
         self.bracket_canvas.show_group_stage(self.group_stage_model)
-
-        # Tegn riktige kampkontroller for gruppespill
         self.draw_group_match_controls()
 
         self.start_group_button.pack_forget()
@@ -712,11 +683,10 @@ class ControlWindow(ctk.CTkToplevel):
             row = ctk.CTkFrame(self.match_controls_frame)
             row.pack(fill="x", padx=6, pady=4)
 
-            t1 = match['team1']['name']
-            t2 = match['team2']['name']
+            t1 = match.team1.name
+            t2 = match.team2.name
             ctk.CTkLabel(row, text=f"{t1} vs {t2}").pack(side="left", padx=6)
 
-            # Knappene lages alltid, men evt. deaktiveres hvis match er spilt
             btn_t1 = ctk.CTkButton(
                 row, text=f"{t1} vant",
                 command=lambda i=idx: self.set_group_winner_popup(i, 1)
@@ -735,8 +705,7 @@ class ControlWindow(ctk.CTkToplevel):
             )
             btn_time.pack(side="right", padx=4)
 
-            # Rediger/angre vises kun når kampen er spilt
-            if match.get("played"):
+            if match.played:
                 ctk.CTkButton(
                     row, text="Rediger resultat",
                     command=lambda i=idx: self.edit_group_result(i)
@@ -747,33 +716,36 @@ class ControlWindow(ctk.CTkToplevel):
                     command=lambda i=idx: self.clear_group_result(i)
                 ).pack(side="right", padx=4)
 
-                # Deaktiver innsending av nytt resultat på samme kamp
                 btn_t1.configure(state="disabled")
                 btn_t2.configure(state="disabled")
                 btn_time.configure(state="disabled")
 
-
-        update_standings_btn = ctk.CTkButton(self.match_controls_frame, text="Oppdater tabell",
-                                            command=lambda: self.bracket_canvas.show_group_stage(self.group_stage_model))
+        update_standings_btn = ctk.CTkButton(
+            self.match_controls_frame,
+            text="Oppdater tabell",
+            command=lambda: self.bracket_canvas.show_group_stage(self.group_stage_model)
+        )
         update_standings_btn.pack(pady=10)
 
     def edit_group_result(self, match_index):
         match = self.group_stage_model.matches[match_index]
-        top = ctk.CTkToplevel(self)
-        top.title("Rediger resultat")
-        self._place_dialog_over(top, width=320, height = 300)
+        top = self._make_dialog("Rediger resultat", width=320, height=340)
 
-        t1 = match['team1']['name']
-        t2 = match['team2']['name']
-        prev_c1 = match.get("team1_cups_left") or 0
-        prev_c2 = match.get("team2_cups_left") or 0
-        prev_w  = match.get("winner") or 1
+        t1 = match.team1.name
+        t2 = match.team2.name
+        prev_c1 = match.team1_cups_left or 0
+        prev_c2 = match.team2_cups_left or 0
+        prev_w = match.winner or 1
 
         ctk.CTkLabel(top, text=f"{t1} kopper igjen (0–10):").pack(pady=(10, 4))
-        e1 = ctk.CTkEntry(top, width=120); e1.insert(0, str(prev_c1)); e1.pack(pady=4)
+        e1 = ctk.CTkEntry(top, width=120)
+        e1.insert(0, str(prev_c1))
+        e1.pack(pady=4)
 
         ctk.CTkLabel(top, text=f"{t2} kopper igjen (0–10):").pack(pady=(10, 4))
-        e2 = ctk.CTkEntry(top, width=120); e2.insert(0, str(prev_c2)); e2.pack(pady=4)
+        e2 = ctk.CTkEntry(top, width=120)
+        e2.insert(0, str(prev_c2))
+        e2.pack(pady=4)
 
         ctk.CTkLabel(top, text="Vinner:").pack(pady=(10, 4))
         winner_var = tk.IntVar(value=prev_w)
@@ -785,44 +757,100 @@ class ControlWindow(ctk.CTkToplevel):
 
         def save(event=None):
             try:
-                c1 = int(e1.get().strip()); c2 = int(e2.get().strip())
+                c1 = int(e1.get().strip())
+                c2 = int(e2.get().strip())
                 self.check_allowed_cup_number(c1)
                 self.check_allowed_cup_number(c2)
                 self.group_stage_model.update_match_result(match_index, c1, c2, winner_var.get())
                 self.bracket_canvas.show_group_stage(self.group_stage_model)
-                self.draw_group_match_controls()  # oppdatér knapper (deaktiver “vant”)
+                self.draw_group_match_controls()
                 top.destroy()
             except Exception:
                 err_lbl.configure(text="Ugyldig antall/kombo. Prøv igjen.")
 
-        btn_row = ctk.CTkFrame(top); btn_row.pack(pady=10)
+        btn_row = ctk.CTkFrame(top)
+        btn_row.pack(pady=10)
         ctk.CTkButton(btn_row, text="Avbryt", command=top.destroy).pack(side="left", padx=6)
         ctk.CTkButton(btn_row, text="Lagre", command=save).pack(side="left", padx=6)
 
-        top.grab_set(); top.focus(); e1.focus()
+        top.grab_set()
+        top.focus()
+        e1.focus()
         top.bind("<Return>", save)
 
     def clear_group_result(self, match_index):
         self.group_stage_model.clear_match_result(match_index)
         self.bracket_canvas.show_group_stage(self.group_stage_model)
-        self.draw_group_match_controls()  # aktiver “vant”-knappene igjen
+        self.draw_group_match_controls()
 
-    
     def set_group_match_result(self, match_index):
-        popup = ctk.CTkInputDialog(title="Kopper igjen", 
-                                text="Angi gjenstående kopper (Lag1,Lag2) f.eks 3,1")
+        popup = ctk.CTkInputDialog(
+            title="Kopper igjen",
+            text="Angi gjenstående kopper (Lag1,Lag2) f.eks 3,1"
+        )
         result = popup.get_input()
         try:
             cups1, cups2 = map(int, result.split(","))
             self.group_stage_model.update_match_result(match_index, cups1, cups2, None)
-        except:
+        except Exception:
             pass
-        
+
     def set_group_match_time(self, match_index):
-        popup = ctk.CTkInputDialog(title="Sett tidspunkt", text="Tidspunkt (HH:MM)")
-        time = popup.get_input()
-        if time:
-            self.group_stage_model.matches[match_index]["time"] = time
+        top = self._make_dialog("Sett tidspunkt", width=360, height=220)
+
+        ctk.CTkLabel(top, text="Tidspunkt (HH:MM):").pack(pady=(20, 8))
+
+        entry = ctk.CTkEntry(top, width=140)
+        entry.pack(pady=6)
+
+        err_lbl = ctk.CTkLabel(top, text="", text_color="tomato")
+        err_lbl.pack(pady=(6, 0))
+
+        def normalize_time(value: str) -> str:
+            value = value.strip()
+
+            if len(value) == 2:
+                value = "00:" + value
+            elif len(value) == 3:
+                value = value[:1] + ":" + value[2:]
+            elif len(value) == 4:
+                if value[1] == ":":
+                    value = "0" + value
+                else:
+                    value = value[:2] + ":" + value[2:]
+
+            return value
+
+        def is_valid_time(value: str) -> bool:
+            if len(value) != 5 or value[2] != ":":
+                return False
+            hh, mm = value.split(":")
+            if not (hh.isdigit() and mm.isdigit()):
+                return False
+            hh = int(hh)
+            mm = int(mm)
+            return 0 <= hh <= 23 and 0 <= mm <= 59
+
+        def save(event=None):
+            new_time = normalize_time(entry.get())
+            if not is_valid_time(new_time):
+                err_lbl.configure(text="Ugyldig klokkeslett. Bruk HH:MM.")
+                return
+
+            self.group_stage_model.matches[match_index].time = new_time
+            self.bracket_canvas.show_group_stage(self.group_stage_model)
+            self.draw_group_match_controls()
+            top.destroy()
+
+        btn_row = ctk.CTkFrame(top)
+        btn_row.pack(pady=16)
+
+        ctk.CTkButton(btn_row, text="Avbryt", command=top.destroy).pack(side="left", padx=6)
+        ctk.CTkButton(btn_row, text="Lagre", command=save).pack(side="left", padx=6)
+
+        entry.bind("<Return>", save)
+        top.bind("<Escape>", lambda _e: top.destroy())
+        entry.focus()
 
     def show_standings(self):
         standings_window = ctk.CTkToplevel(self)
@@ -833,31 +861,25 @@ class ControlWindow(ctk.CTkToplevel):
             frame = ctk.CTkFrame(standings_window)
             frame.pack(fill="x", pady=2, padx=10)
 
-            if team["logo"]:
-                img = Image.open(team["logo"])
+            if team.logo:
+                img = Image.open(team.logo)
                 img.thumbnail((40, 40), Image.LANCZOS)
                 logo_img = ImageTk.PhotoImage(img)
                 logo_label = ctk.CTkLabel(frame, image=logo_img, text="")
                 logo_label.image = logo_img
                 logo_label.pack(side="left", padx=10)
 
-            stats = (f"{idx}. {team['name']} | Wins: {team['wins']} | "
-                    f"Hit: {team['cups_hit']} | Diff: {team['total_cups_diff']}")
-
+            stats = f"{idx}. {team.name} | Wins: {team.wins} | Hit: {team.cups_hit} | Diff: {team.total_cups_diff}"
             ctk.CTkLabel(frame, text=stats, font=("Helvetica", 16)).pack(side="left")
 
-    import sys
 
     def _place_dialog_over(self, top, width=None, height=None):
-        """Plasser Toplevel 'top' over dette vinduet (self) – riktig skjerm, riktig z-order."""
         top.update_idletasks()
         self.update_idletasks()
 
-        # Bestem størrelse først
         w = int(width) if width else max(top.winfo_reqwidth(), 280)
         h = int(height) if height else max(top.winfo_reqheight(), 160)
 
-        # Sett størrelse før posisjon (viktig for noen WM)
         top.geometry(f"{w}x{h}")
 
         if sys.platform == "win32":
@@ -867,50 +889,47 @@ class ControlWindow(ctk.CTkToplevel):
 
                 user32 = ctypes.windll.user32
 
-                # Hent HWND-er
                 hwnd_parent = self.winfo_id()
-                hwnd_child  = top.winfo_id()
+                hwnd_child = top.winfo_id()
 
-                # Strukturer
                 class RECT(ctypes.Structure):
-                    _fields_ = [("left",   wintypes.LONG),
-                                ("top",    wintypes.LONG),
-                                ("right",  wintypes.LONG),
-                                ("bottom", wintypes.LONG)]
+                    _fields_ = [
+                        ("left", wintypes.LONG),
+                        ("top", wintypes.LONG),
+                        ("right", wintypes.LONG),
+                        ("bottom", wintypes.LONG),
+                    ]
 
                 class MONITORINFO(ctypes.Structure):
-                    _fields_ = [("cbSize",   wintypes.DWORD),
-                                ("rcMonitor", RECT),
-                                ("rcWork",    RECT),
-                                ("dwFlags",   wintypes.DWORD)]
+                    _fields_ = [
+                        ("cbSize", wintypes.DWORD),
+                        ("rcMonitor", RECT),
+                        ("rcWork", RECT),
+                        ("dwFlags", wintypes.DWORD),
+                    ]
 
                 MONITOR_DEFAULTTONEAREST = 2
 
-                # Finn monitor for parent
                 hmon = user32.MonitorFromWindow(hwnd_parent, MONITOR_DEFAULTTONEAREST)
                 mi = MONITORINFO()
                 mi.cbSize = ctypes.sizeof(MONITORINFO)
                 user32.GetMonitorInfoW(hmon, ctypes.byref(mi))
 
-                # Parent-rect
                 pr = RECT()
                 user32.GetWindowRect(hwnd_parent, ctypes.byref(pr))
                 pw = pr.right - pr.left
                 ph = pr.bottom - pr.top
 
-                # Center over parent
                 x = pr.left + (pw - w) // 2
-                y = pr.top  + (ph - h) // 2
+                y = pr.top + (ph - h) // 2
 
-                # Klamp til arbeidsområde på aktuell monitor
-                x = max(mi.rcWork.left,  min(x, mi.rcWork.right  - w))
-                y = max(mi.rcWork.top,   min(y, mi.rcWork.bottom - h))
+                x = max(mi.rcWork.left, min(x, mi.rcWork.right - w))
+                y = max(mi.rcWork.top, min(y, mi.rcWork.bottom - h))
 
-                SWP_NOZORDER   = 0x0004
+                SWP_NOZORDER = 0x0004
                 SWP_NOACTIVATE = 0x0010
                 user32.SetWindowPos(hwnd_child, None, int(x), int(y), int(w), int(h), SWP_NOZORDER | SWP_NOACTIVATE)
 
-                # Sørg for at den ligger over og får fokus
                 try:
                     top.attributes("-topmost", True)
                     top.after(200, lambda: top.attributes("-topmost", False))
@@ -922,10 +941,8 @@ class ControlWindow(ctk.CTkToplevel):
                 top.grab_set()
                 return
             except Exception:
-                # Fallback til ren Tk-geo nedenfor
                 pass
 
-        # Fallback: center m/ Tk-geo (macOS/Linux eller hvis ctypes feiler)
         px, py = self.winfo_rootx(), self.winfo_rooty()
         pw, ph = self.winfo_width(), self.winfo_height()
         if pw <= 1 or ph <= 1:
@@ -940,64 +957,75 @@ class ControlWindow(ctk.CTkToplevel):
         top.focus_set()
         top.grab_set()
 
-
-    
-
     def fill_team_list(self):
-        self.teams = []  # <-- viktig: ikke akkumulér
+        self.teams = []
         team_names = self.team_text.get("1.0", "end").strip().splitlines()
-        ...
 
-        
         logo_path = False
         for name in team_names:
+            logo_path=None
             if self.logo_switch:
-                logo_path = fd.askopenfilename(title=f"Velg logo for {name}", filetypes=[("Image files", ".png .jpg .jpeg .gif")])
-            self.teams.append({"name": name, "logo": logo_path if logo_path else None})
+                logo_path = fd.askopenfilename(
+                    title=f"Velg logo for {name}",
+                    filetypes=[("Image files", ".png .jpg .jpeg .gif")]
+                )
+            self.teams.append(Team(name=name, logo=logo_path if logo_path else None))
 
     def build_bracket(self):
-        # Hvis vi ikke har lastet lag fra fil, les fra tekstboksen (og ev. spør om logo)
         if not self.teams:
             self.fill_team_list()
 
-        # Bygg turnering med bare navn (som før)
-        self.tournament_model.build_bracket([team["name"] for team in self.teams])
+        self.tournament_model.build_bracket(self.teams)
 
-        # Koble logoer til de shufflade teamene ETTER bygging – ved navn (ikke indeks)
-        logo_by_name = {t["name"]: t.get("logo") for t in self.teams}
+        logo_by_name = {t.name: t.logo for t in self.teams}
         for t in self.tournament_model.teams:
-            t["logo"] = logo_by_name.get(t["name"])
+            t.logo = logo_by_name.get(t.name)
 
         self.draw_match_controls()
         self.bracket_canvas.refresh()
 
-
-
-
     def draw_match_controls(self):
         for widget in self.match_controls_frame.winfo_children():
             widget.destroy()
+
         rounds = self.tournament_model.get_rounds()
         for r, matches in enumerate(rounds):
             round_label = ctk.CTkLabel(self.match_controls_frame, text=f"Runde {r+1} Kontroller")
             round_label.pack(pady=5)
+
             for mi, match in enumerate(matches):
                 frame = ctk.CTkFrame(self.match_controls_frame)
                 frame.pack(pady=5, fill="x")
-                team1 = match["team1"]['name'] if match["team1"] else "TBD"
-                team2 = match["team2"]['name'] if match["team2"] else "TBD"
+
+                team1 = match.team1.name if match.team1 else "TBD"
+                team2 = match.team2.name if match.team2 else "TBD"
+
                 info_label = ctk.CTkLabel(frame, text=f"Kamp {mi+1}: {team1} vs {team2}")
                 info_label.pack(side="left", padx=5)
-                if match["winner"]:
+
+                if match.winner:
                     btn1 = ctk.CTkButton(frame, text=team1, state="disabled")
                     btn2 = ctk.CTkButton(frame, text=team2, state="disabled")
                 else:
-                    btn1 = ctk.CTkButton(frame, text=team1, command=lambda r=r, mi=mi, t=team1: self.set_winner(r, mi, t))
-                    btn2 = ctk.CTkButton(frame, text=team2, command=lambda r=r, mi=mi, t=team2: self.set_winner(r, mi, t))
+                    btn1 = ctk.CTkButton(
+                        frame,
+                        text=team1,
+                        command=lambda r=r, mi=mi, t=team1: self.set_winner(r, mi, t)
+                    )
+                    btn2 = ctk.CTkButton(
+                        frame,
+                        text=team2,
+                        command=lambda r=r, mi=mi, t=team2: self.set_winner(r, mi, t)
+                    )
 
-                start_time = match["start_time"] if match["start_time"] else "Ikke satt"
-                btn_time = ctk.CTkButton(frame, text=f"Sett starttid ({start_time})", command=lambda r=r, mi=mi: self.set_start_time(r, mi))
+                start_time = match.start_time if match.start_time else "Ikke satt"
+                btn_time = ctk.CTkButton(
+                    frame,
+                    text=f"Sett starttid ({start_time})",
+                    command=lambda r=r, mi=mi: self.set_start_time(r, mi)
+                )
                 btn_time.pack(side="right", padx=5)
+
                 btn_edit = ctk.CTkButton(frame, text="Rediger", command=lambda r=r, mi=mi: self.edit_match(r, mi))
                 btn_edit.pack(side="right", padx=5)
 
@@ -1007,57 +1035,93 @@ class ControlWindow(ctk.CTkToplevel):
     def set_winner(self, round_index, match_index, winner_name):
         match = self.tournament_model.rounds[round_index][match_index]
 
-        if match["team1"] and match["team1"]["name"] == winner_name:
-            winner = match["team1"]
-        elif match["team2"] and match["team2"]["name"] == winner_name:
-            winner = match["team2"]
+        if match.team1 and match.team1.name == winner_name:
+            winner = match.team1
+        elif match.team2 and match.team2.name == winner_name:
+            winner = match.team2
         else:
-            winner = {"name": winner_name, "logo": None}
+            winner = Team(name=winner_name)
 
         self.tournament_model.set_winner(round_index, match_index, winner)
         self.draw_match_controls()
         self.bracket_canvas.refresh()
 
-
     def set_start_time(self, round_index, match_index):
-        popup = ctk.CTkInputDialog(title="Sett starttid", text="Skriv inn starttid (f.eks. HH:MM):")
-        new_time = popup.get_input()
-        if new_time:
-            if len(new_time) == 2:
-                new_time = '00:' + new_time
-            
-            if len(new_time) == 3:
-                new_time = new_time[:1] + ':' + new_time[2:]
-            
-            if len(new_time) == 4:
-                if new_time[1] == ':':
-                    new_time = '0' + new_time
+        top = self._make_dialog("Sett starttid", width=360, height=220)
+
+        ctk.CTkLabel(top, text="Skriv inn starttid (f.eks. HH:MM):").pack(pady=(20, 8))
+
+        entry = ctk.CTkEntry(top, width=140)
+        entry.pack(pady=6)
+
+        err_lbl = ctk.CTkLabel(top, text="", text_color="tomato")
+        err_lbl.pack(pady=(6, 0))
+
+        def normalize_time(value: str) -> str:
+            value = value.strip()
+
+            if len(value) == 2:
+                value = "00:" + value
+            elif len(value) == 3:
+                value = value[:1] + ":" + value[2:]
+            elif len(value) == 4:
+                if value[1] == ":":
+                    value = "0" + value
                 else:
-                    new_time = new_time[:2] + ':' + new_time[2:]
-            
+                    value = value[:2] + ":" + value[2:]
+
+            return value
+
+        def is_valid_time(value: str) -> bool:
+            if len(value) != 5 or value[2] != ":":
+                return False
+            hh, mm = value.split(":")
+            if not (hh.isdigit() and mm.isdigit()):
+                return False
+            hh = int(hh)
+            mm = int(mm)
+            return 0 <= hh <= 23 and 0 <= mm <= 59
+
+        def save(event=None):
+            new_time = normalize_time(entry.get())
+            if not is_valid_time(new_time):
+                err_lbl.configure(text="Ugyldig klokkeslett. Bruk HH:MM.")
+                return
+
             self.tournament_model.set_start_time(round_index, match_index, new_time)
             self.draw_match_controls()
             self.bracket_canvas.refresh()
+            top.destroy()
+
+        btn_row = ctk.CTkFrame(top)
+        btn_row.pack(pady=16)
+
+        ctk.CTkButton(btn_row, text="Avbryt", command=top.destroy).pack(side="left", padx=6)
+        ctk.CTkButton(btn_row, text="Lagre", command=save).pack(side="left", padx=6)
+
+        entry.bind("<Return>", save)
+        top.bind("<Escape>", lambda _e: top.destroy())
+        entry.focus()
 
     def edit_match(self, round_index, match_index):
-        edit_window = ctk.CTkToplevel(self)
-        edit_window.title("Rediger kamp")
+        edit_window = self._make_dialog("Rediger kamp")
+
         match = self.tournament_model.get_rounds()[round_index][match_index]
-        team1_current = match["team1"] if match["team1"] is not None else ""
-        team2_current = match["team2"] if match["team2"] is not None else ""
-        
+        team1_current = match.team1.name if match.team1 is not None else ""
+        team2_current = match.team2.name if match.team2 is not None else ""
+
         label1 = ctk.CTkLabel(edit_window, text="Lag 1:")
         label1.pack(pady=5)
         entry1 = ctk.CTkEntry(edit_window, width=200)
         entry1.insert(0, team1_current)
         entry1.pack(pady=5)
-        
+
         label2 = ctk.CTkLabel(edit_window, text="Lag 2:")
         label2.pack(pady=5)
         entry2 = ctk.CTkEntry(edit_window, width=200)
         entry2.insert(0, team2_current)
         entry2.pack(pady=5)
-        
+
         def save_edits():
             new_team1 = entry1.get().strip() or "TBD"
             new_team2 = entry2.get().strip() or "TBD"
@@ -1065,9 +1129,9 @@ class ControlWindow(ctk.CTkToplevel):
             edit_window.destroy()
             self.draw_match_controls()
             self.bracket_canvas.refresh()
-            
-            save_button = ctk.CTkButton(edit_window, text="Lagre", command=save_edits)
-            save_button.pack(pady=10)
+
+        save_button = ctk.CTkButton(edit_window, text="Lagre", command=save_edits)
+        save_button.pack(pady=10)
 
 if __name__ == "__main__":
     ctk.set_appearance_mode("Dark")
