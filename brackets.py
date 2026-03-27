@@ -116,7 +116,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
             self.canvas.create_text(
                 results_x,
                 text_ypos,
-                text=f"V    |    T    |    D\n{team.points}    |    {team.cups_hit}    |    {team.total_cups_diff}",
+                text=f"P    |    T    |    D\n{team.points}    |    {team.cups_hit}    |    {team.total_cups_diff}",
                 font=("Arial", fontsize),
                 fill="white",
                 justify="left",
