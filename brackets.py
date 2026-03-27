@@ -1,5 +1,5 @@
 
-import sys, csv
+import csv
 
 import customtkinter as ctk
 import tkinter.filedialog as fd
@@ -8,7 +8,7 @@ import tkinter as tk
 from PIL import Image, ImageTk
 from pathlib import Path
 
-from models import TournamentModel, GroupStageModel, Match, Team
+from models import TournamentModel, GroupStageModel, Team
 
 
 class TournamentBracketCanvas(ctk.CTkFrame):
