@@ -8,7 +8,7 @@ from typing import Optional
 class Team:
     name: str
     logo: Optional[str] = None
-    wins: int = 0
+    points: int = 0
     cups_hit: int = 0
     cups_missed: int = 0
     total_cups_diff: int = 0
@@ -114,7 +114,7 @@ class GroupStageModel:
                     Team(
                         name=team.name,
                         logo=team.logo,
-                        wins=0,
+                        points=0,
                         cups_hit=0,
                         cups_missed=0,
                         total_cups_diff=0,
@@ -201,7 +201,7 @@ class GroupStageModel:
     def standings(self):
         return sorted(
             self.teams,
-            key=lambda x: (-x.wins, -x.cups_hit, -x.total_cups_diff)
+            key=lambda x: (-x.points, -x.cups_hit, -x.total_cups_diff)
         )
 
     def _apply_result(self, match, cups_left_team1, cups_left_team2, winner, sign=+1):
@@ -211,23 +211,31 @@ class GroupStageModel:
         cups_hit_team1 = 10 - cups_left_team2
         cups_hit_team2 = 10 - cups_left_team1
 
-        if cups_left_team1 != cups_left_team2:
-            if cups_left_team1 > cups_left_team2 and winner == 1:
-                team1.wins += 2 * sign
-            elif cups_left_team1 < cups_left_team2 and winner == 2:
-                team2.wins += 2 * sign
-            else:
+        # Poenglogikk
+        if cups_left_team1 > cups_left_team2:
+            if winner != 1:
                 raise ValueError("Ugyldig kombinasjon av kopper/vinner")
+            team1.points += 2 * sign
+
+        elif cups_left_team2 > cups_left_team1:
+            if winner != 2:
+                raise ValueError("Ugyldig kombinasjon av kopper/vinner")
+            team2.points += 2 * sign
+
         else:
-            team1.wins += 1 * sign
-            team2.wins += 1 * sign
-            if winner == 1 and cups_left_team1 == cups_hit_team2:
-                team1.wins += 1 * sign
-            elif winner == 2 and cups_left_team1 == cups_hit_team2:
-                team2.wins += 1 * sign
+            # Uavgjort i kopper -> begge får 1 poeng
+            team1.points += 1 * sign
+            team2.points += 1 * sign
+
+            # Ekstrapoeng til vinner av stein-saks-papir
+            if winner == 1:
+                team1.points += 1 * sign
+            elif winner == 2:
+                team2.points += 1 * sign
             else:
                 raise ValueError("Ugyldig tie-break kombinasjon")
 
+        # Statistikk
         team1.cups_hit += cups_hit_team1 * sign
         team1.cups_missed += cups_hit_team2 * sign
         team1.total_cups_diff = team1.cups_hit - team1.cups_missed
