@@ -641,22 +641,14 @@ class ControlWindow(ctk.CTkToplevel):
             self.team_text.delete("1.0", "end")
             self.team_text.insert("1.0", "\n".join(t.name for t in self.teams))
 
-            ok = ctk.CTkToplevel(self)
-            ok.title("Lag lastet")
-            ctk.CTkLabel(ok, text=f"Lastet {len(self.teams)} lag fra fil.").pack(padx=20, pady=14)
-            try:
-                self._place_dialog_over(ok, width=260, height=90)
-            except Exception:
-                pass
+            ok = self._make_dialog("Lag lastet", width=280, height=120)
+            ctk.CTkLabel(ok, text=f"Lastet {len(self.teams)} lag fra fil.").pack(padx=20, pady=20)
+            ctk.CTkButton(ok, text="OK", command=ok.destroy).pack(pady=(0, 10))
 
         except Exception as e:
-            err = ctk.CTkToplevel(self)
-            err.title("Feil")
+            err = self._make_dialog("Feil", width=360, height=160)
             ctk.CTkLabel(err, text=f"Kunne ikke lese filen.\n{e}").pack(padx=20, pady=20)
-            try:
-                self._place_dialog_over(err, width=320, height=120)
-            except Exception:
-                pass
+            ctk.CTkButton(err, text="OK", command=err.destroy).pack(pady=(0, 10))
 
     def start_group_stage(self):
         if not self.teams:
@@ -869,91 +861,6 @@ class ControlWindow(ctk.CTkToplevel):
 
             stats = f"{idx}. {team.name} | Wins: {team.wins} | Hit: {team.cups_hit} | Diff: {team.total_cups_diff}"
             ctk.CTkLabel(frame, text=stats, font=("Helvetica", 16)).pack(side="left")
-
-
-    def _place_dialog_over(self, top, width=None, height=None):
-        top.update_idletasks()
-        self.update_idletasks()
-
-        w = int(width) if width else max(top.winfo_reqwidth(), 280)
-        h = int(height) if height else max(top.winfo_reqheight(), 160)
-
-        top.geometry(f"{w}x{h}")
-
-        if sys.platform == "win32":
-            try:
-                import ctypes
-                from ctypes import wintypes
-
-                user32 = ctypes.windll.user32
-
-                hwnd_parent = self.winfo_id()
-                hwnd_child = top.winfo_id()
-
-                class RECT(ctypes.Structure):
-                    _fields_ = [
-                        ("left", wintypes.LONG),
-                        ("top", wintypes.LONG),
-                        ("right", wintypes.LONG),
-                        ("bottom", wintypes.LONG),
-                    ]
-
-                class MONITORINFO(ctypes.Structure):
-                    _fields_ = [
-                        ("cbSize", wintypes.DWORD),
-                        ("rcMonitor", RECT),
-                        ("rcWork", RECT),
-                        ("dwFlags", wintypes.DWORD),
-                    ]
-
-                MONITOR_DEFAULTTONEAREST = 2
-
-                hmon = user32.MonitorFromWindow(hwnd_parent, MONITOR_DEFAULTTONEAREST)
-                mi = MONITORINFO()
-                mi.cbSize = ctypes.sizeof(MONITORINFO)
-                user32.GetMonitorInfoW(hmon, ctypes.byref(mi))
-
-                pr = RECT()
-                user32.GetWindowRect(hwnd_parent, ctypes.byref(pr))
-                pw = pr.right - pr.left
-                ph = pr.bottom - pr.top
-
-                x = pr.left + (pw - w) // 2
-                y = pr.top + (ph - h) // 2
-
-                x = max(mi.rcWork.left, min(x, mi.rcWork.right - w))
-                y = max(mi.rcWork.top, min(y, mi.rcWork.bottom - h))
-
-                SWP_NOZORDER = 0x0004
-                SWP_NOACTIVATE = 0x0010
-                user32.SetWindowPos(hwnd_child, None, int(x), int(y), int(w), int(h), SWP_NOZORDER | SWP_NOACTIVATE)
-
-                try:
-                    top.attributes("-topmost", True)
-                    top.after(200, lambda: top.attributes("-topmost", False))
-                except Exception:
-                    pass
-
-                top.lift()
-                top.focus_set()
-                top.grab_set()
-                return
-            except Exception:
-                pass
-
-        px, py = self.winfo_rootx(), self.winfo_rooty()
-        pw, ph = self.winfo_width(), self.winfo_height()
-        if pw <= 1 or ph <= 1:
-            self.update_idletasks()
-            pw, ph = max(self.winfo_width(), 600), max(self.winfo_height(), 400)
-
-        x = px + (pw - w) // 2
-        y = py + (ph - h) // 2
-        top.geometry(f"{w}x{h}+{x}+{y}")
-        top.transient(self)
-        top.lift()
-        top.focus_set()
-        top.grab_set()
 
     def fill_team_list(self):
         self.teams = []
