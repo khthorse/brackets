@@ -116,7 +116,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
             self.canvas.create_text(
                 results_x,
                 text_ypos,
-                text=f"V    |    T    |    D\n{team.wins}    |    {team.cups_hit}    |    {team.total_cups_diff}",
+                text=f"V    |    T    |    D\n{team.points}    |    {team.cups_hit}    |    {team.total_cups_diff}",
                 font=("Arial", fontsize),
                 fill="white",
                 justify="left",
@@ -508,7 +508,7 @@ class ControlWindow(ctk.CTkToplevel):
             src = top_4_by_name.get(team.name)
             if src:
                 team.logo = src.logo
-                team.wins = src.wins
+                team.points = src.points
                 team.cups_hit = src.cups_hit
                 team.total_cups_diff = src.total_cups_diff
 
@@ -775,18 +775,6 @@ class ControlWindow(ctk.CTkToplevel):
         self.bracket_canvas.show_group_stage(self.group_stage_model)
         self.draw_group_match_controls()
 
-    def set_group_match_result(self, match_index):
-        popup = ctk.CTkInputDialog(
-            title="Kopper igjen",
-            text="Angi gjenstående kopper (Lag1,Lag2) f.eks 3,1"
-        )
-        result = popup.get_input()
-        try:
-            cups1, cups2 = map(int, result.split(","))
-            self.group_stage_model.update_match_result(match_index, cups1, cups2, None)
-        except Exception:
-            pass
-
     def set_group_match_time(self, match_index):
         top = self._make_dialog("Sett tidspunkt", width=360, height=220)
 
@@ -836,22 +824,22 @@ class ControlWindow(ctk.CTkToplevel):
                 logo_label.image = logo_img
                 logo_label.pack(side="left", padx=10)
 
-            stats = f"{idx}. {team.name} | Wins: {team.wins} | Hit: {team.cups_hit} | Diff: {team.total_cups_diff}"
+            stats = f"{idx}. {team.name} | Points: {team.points} | Hit: {team.cups_hit} | Diff: {team.total_cups_diff}"
             ctk.CTkLabel(frame, text=stats, font=("Helvetica", 16)).pack(side="left")
 
     def fill_team_list(self):
         self.teams = []
-        team_names = self.team_text.get("1.0", "end").strip().splitlines()
+        team_names = [name.strip() for name in self.team_text.get("1.0", "end").splitlines() if name.strip()]
 
-        logo_path = False
         for name in team_names:
-            logo_path=None
+            logo_path = None
             if self.logo_switch:
                 logo_path = fd.askopenfilename(
                     title=f"Velg logo for {name}",
                     filetypes=[("Image files", ".png .jpg .jpeg .gif")]
                 )
-            self.teams.append(Team(name=name, logo=logo_path if logo_path else None))
+
+            self.teams.append(Team(name=name, logo=logo_path))
 
     def build_bracket(self):
         if not self.teams:
