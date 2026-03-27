@@ -18,7 +18,7 @@ class Team:
 class Match:
     team1: Optional[Team] = None
     team2: Optional[Team] = None
-    winner: Optional[Team] = None
+    winner: Optional[object] = None
     start_time: Optional[str] = None
     played: bool = False
     team1_cups_left: Optional[int] = None
@@ -28,12 +28,11 @@ class Match:
 
 class TournamentModel:
     def __init__(self):
-        self.loaded_teams = []  # [{"name": ..., "logo": ...}, ...]
+        self.loaded_teams = []
         self.teams: list[Team] = []
-        self.rounds: list[list[Match]] = []  # Hver runde er en liste med kamper
+        self.rounds: list[list[Match]] = []
 
     def build_bracket(self, teams_input):
-
         team_objs = []
 
         for item in teams_input:
@@ -63,7 +62,7 @@ class TournamentModel:
 
         first_round = []
         for i in range(0, size, 2):
-            first_round.append(Match(team1=seeds[i], team2=seeds[i + 1])
+            first_round.append(Match(team1=seeds[i], team2=seeds[i + 1]))
         self.rounds = [first_round]
 
         rsize = size // 2
@@ -75,13 +74,12 @@ class TournamentModel:
                 self.rounds.append(matches)
             rsize //= 2
 
-
     def set_winner(self, round_index, match_index, winner: Team):
         self.rounds[round_index][match_index].winner = winner
         if round_index + 1 < len(self.rounds):
             next_match_index = match_index // 2
             next_match = self.rounds[round_index + 1][next_match_index]
-            
+
             if match_index % 2 == 0:
                 next_match.team1 = winner
             else:
@@ -96,9 +94,15 @@ class TournamentModel:
         if isinstance(team2, str):
             team2 = Team(name=team2) if team2 and team2 != "TBD" else None
 
+        match = self.rounds[round_index][match_index]
+        match.team1 = team1
+        match.team2 = team2
+        match.winner = None
+        match.start_time = None
+
     def get_rounds(self):
         return self.rounds
-    
+
 
 class GroupStageModel:
     def __init__(self, teams):
@@ -129,27 +133,29 @@ class GroupStageModel:
     def generate_matches(self):
         teams_shuffled = self.teams[:]
         random.shuffle(teams_shuffled)
-        
+
         n = len(teams_shuffled)
         assert n % 2 == 0, "Antall lag bør være partall for dette oppsettet."
-        
-        # Sørg for at ingen møter samme motstander to ganger
+
         round1 = []
         for i in range(0, n, 2):
-            round1.append(Match(team1=teams_shuffled[i], team2=teams_shuffled[i+1]))
+            round1.append(Match(team1=teams_shuffled[i], team2=teams_shuffled[i + 1]))
 
-        # Lag en ny tilfeldig rekkefølge og sørg for unike kamper
         round2 = []
         valid_round = False
+
+        round1_pairs = [
+            frozenset((m.team1.name, m.team2.name))
+            for m in round1
+        ]
 
         while not valid_round:
             random.shuffle(teams_shuffled)
             round2 = [
-                Match(team1=teams_shuffled[i], team2=teams_shuffled[i+1])
+                Match(team1=teams_shuffled[i], team2=teams_shuffled[i + 1])
                 for i in range(0, n, 2)
             ]
 
-            # sjekk at ingen par går igjen fra runde 1
             valid_round = all(
                 frozenset((m.team1.name, m.team2.name)) not in round1_pairs
                 for m in round2
@@ -160,37 +166,51 @@ class GroupStageModel:
     def update_match_result(self, match_index, cups_left_team1, cups_left_team2, winner):
         match = self.matches[match_index]
 
-        # Rull tilbake gammelt resultat hvis kampen var spilt
-        if match.played:
-            prev_c1 = match.team1_cups_left
-            prev_c2 = match.team2_cups_left
-            prev_w  = match.winner
-            if prev_c1 is not None and prev_c2 is not None and prev_w in (1, 2):
-                self._apply_result(match, prev_c1, prev_c2, prev_w, sign=-1)
+        # Lagre gammelt resultat
+        old_team1_cups_left = match.team1_cups_left
+        old_team2_cups_left = match.team2_cups_left
+        old_winner = match.winner
+        old_played = match.played
 
-        # Lagre nytt resultat og påfør
-        match.team1_cups_left = cups_left_team1
-        match.team2_cups_left = cups_left_team2
-        match.winner = winner
-        self._apply_result(match, cups_left_team1, cups_left_team2, winner, sign=+1)
-        match.played = True
+        # Rull tilbake gammelt resultat hvis kampen allerede var spilt
+        if old_played and old_team1_cups_left is not None and old_team2_cups_left is not None and old_winner in (1, 2):
+            self._apply_result(match, old_team1_cups_left, old_team2_cups_left, old_winner, sign=-1)
 
+        try:
+            # Test og påfør nytt resultat
+            self._apply_result(match, cups_left_team1, cups_left_team2, winner, sign=+1)
+
+            # Bare lagre hvis alt gikk bra
+            match.team1_cups_left = cups_left_team1
+            match.team2_cups_left = cups_left_team2
+            match.winner = winner
+            match.played = True
+
+        except Exception:
+            # Gjenopprett gammelt resultat i tabellen hvis nytt resultat var ugyldig
+            if old_played and old_team1_cups_left is not None and old_team2_cups_left is not None and old_winner in (1, 2):
+                self._apply_result(match, old_team1_cups_left, old_team2_cups_left, old_winner, sign=+1)
+
+            # Gjenopprett gammel match-state
+            match.team1_cups_left = old_team1_cups_left
+            match.team2_cups_left = old_team2_cups_left
+            match.winner = old_winner
+            match.played = old_played
+            raise
 
     def standings(self):
         return sorted(
             self.teams,
             key=lambda x: (-x.wins, -x.cups_hit, -x.total_cups_diff)
         )
-    
+
     def _apply_result(self, match, cups_left_team1, cups_left_team2, winner, sign=+1):
-        """Påfør (sign=+1) eller rull tilbake (sign=-1) et resultat i tabellen."""
         team1 = next(t for t in self.teams if t.name == match.team1.name)
         team2 = next(t for t in self.teams if t.name == match.team2.name)
 
         cups_hit_team1 = 10 - cups_left_team2
         cups_hit_team2 = 10 - cups_left_team1
 
-        # Poeng
         if cups_left_team1 != cups_left_team2:
             if cups_left_team1 > cups_left_team2 and winner == 1:
                 team1.wins += 2 * sign
@@ -208,7 +228,6 @@ class GroupStageModel:
             else:
                 raise ValueError("Ugyldig tie-break kombinasjon")
 
-        # Statistikk
         team1.cups_hit += cups_hit_team1 * sign
         team1.cups_missed += cups_hit_team2 * sign
         team1.total_cups_diff = team1.cups_hit - team1.cups_missed
@@ -225,7 +244,8 @@ class GroupStageModel:
 
         prev_c1 = match.team1_cups_left
         prev_c2 = match.team2_cups_left
-        prev_w  = match.winner
+        prev_w = match.winner
+
         if prev_c1 is not None and prev_c2 is not None and prev_w in (1, 2):
             self._apply_result(match, prev_c1, prev_c2, prev_w, sign=-1)
 
