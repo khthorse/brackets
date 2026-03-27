@@ -1,3 +1,31 @@
+import random
+
+from dataclasses import dataclass
+from typing import Optional
+
+
+@dataclass
+class Team:
+    name: str
+    logo: Optional[str] = None
+    wins: int = 0
+    cups_hit: int = 0
+    cups_missed: int = 0
+    total_cups_diff: int = 0
+
+
+@dataclass
+class Match:
+    team1: Optional[Team] = None
+    team2: Optional[Team] = None
+    winner: Optional[Team] = None
+    start_time: Optional[str] = None
+    played: bool = False
+    team1_cups_left: Optional[int] = None
+    team2_cups_left: Optional[int] = None
+    time: Optional[str] = None
+
+
 class TournamentModel:
     def __init__(self):
         self.loaded_teams = []  # [{"name": ..., "logo": ...}, ...]
