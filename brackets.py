@@ -474,6 +474,11 @@ class ControlWindow(ctk.CTkToplevel):
 
         return top
     
+    def _show_message_dialog(self, title, message, width=320, height=140):
+        top = self._make_dialog(title, width=width, height=height)
+        ctk.CTkLabel(top, text=message, justify="center").pack(padx=20, pady=20)
+        ctk.CTkButton(top, text="OK", command=top.destroy).pack(pady=(0, 12))
+    
     def _set_dark_title_bar(self, window):
         try:
             import ctypes
@@ -641,14 +646,10 @@ class ControlWindow(ctk.CTkToplevel):
             self.team_text.delete("1.0", "end")
             self.team_text.insert("1.0", "\n".join(t.name for t in self.teams))
 
-            ok = self._make_dialog("Lag lastet", width=280, height=120)
-            ctk.CTkLabel(ok, text=f"Lastet {len(self.teams)} lag fra fil.").pack(padx=20, pady=20)
-            ctk.CTkButton(ok, text="OK", command=ok.destroy).pack(pady=(0, 10))
+            self._show_message_dialog("Lag lastet", f"Lastet {len(self.teams)} lag fra fil.", 280, 120)
 
         except Exception as e:
-            err = self._make_dialog("Feil", width=360, height=160)
-            ctk.CTkLabel(err, text=f"Kunne ikke lese filen.\n{e}").pack(padx=20, pady=20)
-            ctk.CTkButton(err, text="OK", command=err.destroy).pack(pady=(0, 10))
+            self._show_message_dialog("Feil", f"Kunne ikke lese filen.\n{e}", 360, 160)
 
     def start_group_stage(self):
         if not self.teams:
@@ -796,34 +797,9 @@ class ControlWindow(ctk.CTkToplevel):
         err_lbl = ctk.CTkLabel(top, text="", text_color="tomato")
         err_lbl.pack(pady=(6, 0))
 
-        def normalize_time(value: str) -> str:
-            value = value.strip()
-
-            if len(value) == 2:
-                value = "00:" + value
-            elif len(value) == 3:
-                value = value[:1] + ":" + value[2:]
-            elif len(value) == 4:
-                if value[1] == ":":
-                    value = "0" + value
-                else:
-                    value = value[:2] + ":" + value[2:]
-
-            return value
-
-        def is_valid_time(value: str) -> bool:
-            if len(value) != 5 or value[2] != ":":
-                return False
-            hh, mm = value.split(":")
-            if not (hh.isdigit() and mm.isdigit()):
-                return False
-            hh = int(hh)
-            mm = int(mm)
-            return 0 <= hh <= 23 and 0 <= mm <= 59
-
         def save(event=None):
-            new_time = normalize_time(entry.get())
-            if not is_valid_time(new_time):
+            new_time = self._normalize_time(entry.get())
+            if not self._is_valid_time(new_time):
                 err_lbl.configure(text="Ugyldig klokkeslett. Bruk HH:MM.")
                 return
 
@@ -951,6 +927,31 @@ class ControlWindow(ctk.CTkToplevel):
         self.draw_match_controls()
         self.bracket_canvas.refresh()
 
+    def _normalize_time(value: str) -> str:
+        value = value.strip()
+
+        if len(value) == 2:
+            value = "00:" + value
+        elif len(value) == 3:
+            value = value[:1] + ":" + value[2:]
+        elif len(value) == 4:
+            if value[1] == ":":
+                value = "0" + value
+            else:
+                value = value[:2] + ":" + value[2:]
+
+        return value
+
+    def _is_valid_time(value: str) -> bool:
+        if len(value) != 5 or value[2] != ":":
+            return False
+        hh, mm = value.split(":")
+        if not (hh.isdigit() and mm.isdigit()):
+            return False
+        hh = int(hh)
+        mm = int(mm)
+        return 0 <= hh <= 23 and 0 <= mm <= 59
+
     def set_start_time(self, round_index, match_index):
         top = self._make_dialog("Sett starttid", width=360, height=220)
 
@@ -962,34 +963,9 @@ class ControlWindow(ctk.CTkToplevel):
         err_lbl = ctk.CTkLabel(top, text="", text_color="tomato")
         err_lbl.pack(pady=(6, 0))
 
-        def normalize_time(value: str) -> str:
-            value = value.strip()
-
-            if len(value) == 2:
-                value = "00:" + value
-            elif len(value) == 3:
-                value = value[:1] + ":" + value[2:]
-            elif len(value) == 4:
-                if value[1] == ":":
-                    value = "0" + value
-                else:
-                    value = value[:2] + ":" + value[2:]
-
-            return value
-
-        def is_valid_time(value: str) -> bool:
-            if len(value) != 5 or value[2] != ":":
-                return False
-            hh, mm = value.split(":")
-            if not (hh.isdigit() and mm.isdigit()):
-                return False
-            hh = int(hh)
-            mm = int(mm)
-            return 0 <= hh <= 23 and 0 <= mm <= 59
-
         def save(event=None):
-            new_time = normalize_time(entry.get())
-            if not is_valid_time(new_time):
+            new_time = self._normalize_time(entry.get())
+            if not self._is_valid_time(new_time):
                 err_lbl.configure(text="Ugyldig klokkeslett. Bruk HH:MM.")
                 return
 
