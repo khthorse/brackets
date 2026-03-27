@@ -396,7 +396,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
                 self.canvas.create_rectangle(x0, y0, x1, y1, fill="gray20", outline="black")
 
                 start_text = f"Starter: {match['start_time']}" if match["start_time"] else ""
-                self.canvas.create_text(x, y0 - 20, text=start_text, font=("Helvetica", 12), fill="white")
+                #self.canvas.create_text(x, y0 - 20, text=start_text, font=("Helvetica", 12), fill="white") Draw starttime above match box
 
                 team1_name = match["team1"]["name"] if match["team1"] else "TBD"
                 team2_name = match["team2"]["name"] if match["team2"] else "TBD"
@@ -433,9 +433,24 @@ class TournamentBracketCanvas(ctk.CTkFrame):
                             child_x, child_y = positions[r - 1][child_idx]
                             child_x_right = child_x + box_width / 2
                             mid_x = (child_x_right + parent_x_left) / 2
+
+                            # Tegn forbindelseslinjer
                             self.canvas.create_line(child_x_right, child_y, mid_x, child_y, fill="white")
                             self.canvas.create_line(mid_x, child_y, mid_x, y, fill="white")
                             self.canvas.create_line(mid_x, y, parent_x_left, y, fill="white")
+
+                            # Hent kampen fra forrige runde og tegn starttid over den horisontale linjen
+                            child_match = rounds[r - 1][child_idx]
+                            if child_match.get("start_time"):
+                                text_x = (child_x_right + mid_x) / 2
+                                text_y = child_y - 14
+                                self.canvas.create_text(
+                                    text_x,
+                                    text_y,
+                                    text=f"Starter: {child_match['start_time']}",
+                                    font=("Helvetica", 11),
+                                    fill="white"
+                                )
 
         self.canvas.config(scrollregion=self.canvas.bbox("all"))
 
@@ -681,7 +696,7 @@ class ControlWindow(ctk.CTkToplevel):
         # Vis gruppespillet direkte i bracket_canvas
         self.bracket_canvas.show_group_stage(self.group_stage_model)
 
-        # Tegn riktige kampkontroller for gruppespill (du må lage denne!)
+        # Tegn riktige kampkontroller for gruppespill
         self.draw_group_match_controls()
 
         self.start_group_button.pack_forget()
@@ -1050,9 +1065,9 @@ class ControlWindow(ctk.CTkToplevel):
             edit_window.destroy()
             self.draw_match_controls()
             self.bracket_canvas.refresh()
-        
-        save_button = ctk.CTkButton(edit_window, text="Lagre", command=save_edits)
-        save_button.pack(pady=10)
+            
+            save_button = ctk.CTkButton(edit_window, text="Lagre", command=save_edits)
+            save_button.pack(pady=10)
 
 if __name__ == "__main__":
     ctk.set_appearance_mode("Dark")
