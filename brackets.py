@@ -562,8 +562,8 @@ class ControlWindow(ctk.CTkToplevel):
                     self.draw_group_match_controls()
 
                 top.destroy()
-            except ValueError:
-                err_lbl.configure(text="Ugyldig antall/kombo. Prøv igjen.")
+            except ValueError as e:
+                err_lbl.configure(text=str(e))
 
         btn_row = ctk.CTkFrame(top)
         btn_row.pack(pady=12)
@@ -575,8 +575,7 @@ class ControlWindow(ctk.CTkToplevel):
         top.bind("<Escape>", lambda _e: top.destroy())
 
         top.grab_set()
-        top.focus()
-        e1.focus()
+        top.after(50, lambda: e1.focus_force())
         top.wait_window()
 
     def _parse_team_file(self, filepath: str):
@@ -693,7 +692,7 @@ class ControlWindow(ctk.CTkToplevel):
 
             btn_time = ctk.CTkButton(
                 row, text="Sett tidspunkt",
-                command=lambda i=idx: self.set_group_match_time(i)
+                command=lambda i=idx: self.set_group_match_timer(i)
             )
             btn_time.pack(side="right", padx=4)
 
@@ -757,8 +756,8 @@ class ControlWindow(ctk.CTkToplevel):
                 self.bracket_canvas.show_group_stage(self.group_stage_model)
                 self.draw_group_match_controls()
                 top.destroy()
-            except Exception:
-                err_lbl.configure(text="Ugyldig antall/kombo. Prøv igjen.")
+            except ValueError as e:
+                err_lbl.configure(text=str(e))
 
         btn_row = ctk.CTkFrame(top)
         btn_row.pack(pady=10)
@@ -769,13 +768,15 @@ class ControlWindow(ctk.CTkToplevel):
         top.focus()
         e1.focus()
         top.bind("<Return>", save)
+        top.bind("<Escape>", lambda _e: top.destroy())
+        top.after(50, lambda: e1.focus_force())
 
     def clear_group_result(self, match_index):
         self.group_stage_model.clear_match_result(match_index)
         self.bracket_canvas.show_group_stage(self.group_stage_model)
         self.draw_group_match_controls()
 
-    def set_group_match_time(self, match_index):
+    def set_group_match_timer(self, match_index):
         top = self._make_dialog("Sett tidspunkt", width=360, height=220)
 
         ctk.CTkLabel(top, text="Tidspunkt (HH:MM):").pack(pady=(20, 8))
@@ -805,7 +806,7 @@ class ControlWindow(ctk.CTkToplevel):
 
         entry.bind("<Return>", save)
         top.bind("<Escape>", lambda _e: top.destroy())
-        entry.focus()
+        top.after(50, lambda: entry.focus_force())
 
     def show_standings(self):
         standings_window = ctk.CTkToplevel(self)
@@ -916,22 +917,34 @@ class ControlWindow(ctk.CTkToplevel):
         self.draw_match_controls()
         self.bracket_canvas.refresh()
 
-    def _normalize_time(value: str) -> str:
+    def _normalize_time(self, value: str) -> str:
         value = value.strip()
 
-        if len(value) == 2:
-            value = "00:" + value
-        elif len(value) == 3:
-            value = value[:1] + ":" + value[2:]
-        elif len(value) == 4:
-            if value[1] == ":":
-                value = "0" + value
-            else:
-                value = value[:2] + ":" + value[2:]
+        # Hvis allerede format HH:MM → returner direkte
+        if ":" in value:
+            return value
+
+        # Kun tall → tolk smart
+        if value.isdigit():
+            if len(value) <= 2:
+                # "8" → "08:00"
+                return f"{int(value):02d}:00"
+
+            elif len(value) == 3:
+                # "800" → "08:00", "930" → "09:30"
+                h = int(value[0])
+                m = int(value[1:])
+                return f"{h:02d}:{m:02d}"
+
+            elif len(value) == 4:
+                # "1330" → "13:30"
+                h = int(value[:2])
+                m = int(value[2:])
+                return f"{h:02d}:{m:02d}"
 
         return value
 
-    def _is_valid_time(value: str) -> bool:
+    def _is_valid_time(self, value: str) -> bool:
         if len(value) != 5 or value[2] != ":":
             return False
         hh, mm = value.split(":")
@@ -971,7 +984,8 @@ class ControlWindow(ctk.CTkToplevel):
 
         entry.bind("<Return>", save)
         top.bind("<Escape>", lambda _e: top.destroy())
-        entry.focus()
+
+        top.after(50, lambda: entry.focus_force())
 
     def edit_match(self, round_index, match_index):
         edit_window = self._make_dialog("Rediger kamp")
@@ -1002,6 +1016,7 @@ class ControlWindow(ctk.CTkToplevel):
 
         save_button = ctk.CTkButton(edit_window, text="Lagre", command=save_edits)
         save_button.pack(pady=10)
+        edit_window.after(50, lambda: entry1.focus_force())
 
 if __name__ == "__main__":
     ctk.set_appearance_mode("Dark")
