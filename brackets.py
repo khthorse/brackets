@@ -1,7 +1,5 @@
 
-import sys
-import math
-import os, csv
+import sys, csv
 
 import customtkinter as ctk
 import tkinter.filedialog as fd
@@ -444,7 +442,7 @@ class ControlWindow(ctk.CTkToplevel):
 
         self.draw_match_controls()
         self.teams = []
-        
+
     def _make_dialog(self, title, width=350, height=220):
         top = ctk.CTkToplevel(self)
         top.title(title)
