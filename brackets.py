@@ -649,6 +649,7 @@ class ControlWindow(ctk.CTkToplevel):
             self._show_message_dialog("Lag lastet", f"Lastet {len(self.teams)} lag fra fil.", 280, 120)
 
         except Exception as e:
+            print(f"Feil ved lasting av lag: {e}")
             self._show_message_dialog("Feil", f"Kunne ikke lese filen.\n{e}", 360, 160)
 
     def start_group_stage(self):
