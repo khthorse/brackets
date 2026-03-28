@@ -76,18 +76,8 @@ class ControlWindow(ctk.CTkToplevel):
             status_label.pack(side="left", padx=8)
 
             def update_timer_info(t=timer, tl=time_label, sl=status_label):
-                minutes, seconds = divmod(max(t.current_time, 0), 60)
-                tl.configure(text=f"{minutes:02d}:{seconds:02d}")
-
-                if t.current_time < 0:
-                    sl.configure(text="Ferdig")
-                elif t.paused:
-                    sl.configure(text="Pause")
-                elif t.timer_id is not None:
-                    sl.configure(text="Kjører")
-                else:
-                    sl.configure(text="Klar")
-
+                tl.configure(text=t.get_display_time())
+                sl.configure(text=t.get_status_text())
                 self.after(500, lambda: update_timer_info(t, tl, sl))
 
             update_timer_info()

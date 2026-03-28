@@ -169,6 +169,20 @@ class Timer:
             raise ValueError("Ugyldig tid. Bruk MM:SS.")
         self.set_time_seconds(hhmm_to_seconds(normalized))
 
+    def get_display_time(self) -> str:
+        minutes, seconds = divmod(max(self.current_time, 0), 60)
+        return f"{minutes:02d}:{seconds:02d}"
+
+
+    def get_status_text(self) -> str:
+        if self.current_time < 0:
+            return "Ferdig"
+        if self.paused:
+            return "Pause"
+        if self.timer_id is not None:
+            return "Kjører"
+        return "Klar"
+
 
     if __name__ == "__main__":
         ctk.set_appearance_mode('dark')
