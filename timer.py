@@ -13,6 +13,10 @@ class Timer:
         self.timer_id = None
         self.show_controls = show_controls
 
+        self._pulse_phase = 0.0
+        self._blink_on = True
+        self._blink_job = None
+
         self._observers = []
         self._start_timestamp = None
         self._remaining_before_start = float(initial_time)
@@ -98,10 +102,16 @@ class Timer:
             progress = 0
 
         ext = -progress * 360
+
         color = self.get_time_color()
 
+
+        pulse = self._pulse_factor()
+        arc_width = 15 + pulse * 3
+
+        self.canvas.itemconfig(self.arc, extent=ext, outline=color, width=arc_width)
         self.canvas.itemconfig(self.canvas_text, text=time_str, fill=color)
-        self.canvas.itemconfig(self.arc, extent=ext, outline=color)
+
 
         self._notify_observers()
 
@@ -119,9 +129,13 @@ class Timer:
         if hasattr(self, "start_button"):
             self.start_button.configure(state=ctk.DISABLED)
 
+        self._stop_finished_blink()
+
         self._start_timestamp = time.time()
         self._remaining_before_start = float(self.current_time)
+        self._pulse_phase = 0.0
 
+        self.current_time = self._remaining_before_start
         self.update_label()
         self.timer_id = self.master.after(50, self._tick)
 
@@ -132,6 +146,7 @@ class Timer:
 
         elapsed = time.time() - self._start_timestamp
         self.current_time = self._remaining_before_start - elapsed
+        self._pulse_phase += 0.35
 
         if self.current_time > 0:
             self.update_label()
@@ -142,11 +157,15 @@ class Timer:
 
     def _finish_timer(self):
         self.timer_id = None
+        self.current_time = -1
+        self._pulse_phase = 0.0
 
         color = self.get_time_color()
 
         self.canvas.itemconfig(self.canvas_text, text="Ferdig!", fill=color)
-        self.canvas.itemconfig(self.arc, extent=-359.999, outline=color)
+        self.canvas.itemconfig(self.arc, extent=-359.999, outline=color, width=15)
+
+        self._start_finished_blink()
 
         self._notify_observers()
 
@@ -167,9 +186,38 @@ class Timer:
 
         self._notify_observers()
 
+    
+    def _start_finished_blink(self):
+        if self._blink_job is not None:
+            return
+        self._blink_on = True
+        self._blink_once()
+
+
+    def _blink_once(self):
+        color = self.get_time_color()
+
+        if self._blink_on:
+            self.canvas.itemconfig(self.canvas_text, text="Ferdig!", fill=color)
+            self.canvas.itemconfig(self.arc, outline=color, width=15)
+        else:
+            self.canvas.itemconfig(self.canvas_text, text="Ferdig!", fill="#2b2b2b")
+            self.canvas.itemconfig(self.arc, outline="#2b2b2b", width=15)
+
+        self._blink_on = not self._blink_on
+        self._notify_observers()
+        self._blink_job = self.master.after(400, self._blink_once)
+
     def reset_timer(self):
         """Resetter timeren til startverdien."""
         self.set_time_seconds(self.initial_time)
+
+    def _stop_finished_blink(self):
+        if self._blink_job is not None:
+            self.master.after_cancel(self._blink_job)
+            self._blink_job = None
+
+        self._blink_on = True
 
     def open_change_time_popup(self):
         popup = ctk.CTkInputDialog(title="Change Time", text="enter new time:  mm:ss")
@@ -184,10 +232,13 @@ class Timer:
 
         try:
             self.set_time_from_input(new_time)
-        except ValueError:
+            
+        except ValueError: 
             self.open_change_time_popup()
 
     def set_time_seconds(self, seconds: int):
+        self._stop_finished_blink()
+
         if hasattr(self, "start_button"):
             self.start_button.configure(state=ctk.NORMAL)
 
@@ -277,7 +328,7 @@ class Timer:
         # Myk overgang gul -> rød
         t = (0.10 - fraction_left) / 0.10 if fraction_left >= 0 else 1.0
         return self._lerp_color(yellow, red, t)
-    
+
     def _lerp_color(self, start_hex: str, end_hex: str, t: float) -> str:
         t = max(0.0, min(1.0, t))
 
@@ -292,6 +343,19 @@ class Timer:
         b = round(sb + (eb - sb) * t)
 
         return f"#{r:02x}{g:02x}{b:02x}"
+    
+    def _pulse_factor(self) -> float:
+        if self.initial_time <= 0:
+            return 0.0
+
+        remaining = max(self.current_time, 0)
+        fraction_left = remaining / self.initial_time
+
+        if fraction_left > 0.10:
+            return 0.0
+
+        import math
+        return 0.5 + 0.5 * math.sin(self._pulse_phase)
 
 
 if __name__ == "__main__":
