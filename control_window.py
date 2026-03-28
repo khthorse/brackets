@@ -128,17 +128,11 @@ class ControlWindow(ctk.CTkToplevel):
         err_lbl.pack(pady=(6, 0))
 
         def save(event=None):
-            new_time = normalize_time_input(entry.get())
-            if not is_valid_hhmm(new_time):
-                err_lbl.configure(text="Ugyldig tid. Bruk MM:SS.")
-                return
-
-            timer.reset_timer()
-            timer.current_time = hhmm_to_seconds(new_time)
-            timer.initial_time = timer.current_time
-            timer.canvas.itemconfig(timer.canvas_text, fill="white")
-            timer.update_label()
-            top.destroy()
+            try:
+                timer.set_time_from_input(entry.get())
+                top.destroy()
+            except ValueError as e:
+                err_lbl.configure(text=str(e))
 
         btn_row = ctk.CTkFrame(top)
         btn_row.pack(pady=16)

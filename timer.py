@@ -144,9 +144,35 @@ class Timer:
         self.canvas.itemconfig(self.canvas_text, fill="white")
         self.update_label()
             
-if __name__ == "__main__":
-    ctk.set_appearance_mode('dark')
-    root = ctk.CTk()
-    root.title('Timer')
-    timer = Timer(master=root, initial_time=20, timer_label='Timer')
-    root.mainloop()
+    def set_time_seconds(self, seconds: int):
+        if hasattr(self, "start_button"):
+            self.start_button.configure(state=ctk.NORMAL)
+
+        if self.timer_id:
+            self.master.after_cancel(self.timer_id)
+            self.timer_id = None
+
+        self.current_time = seconds
+        self.initial_time = seconds
+        self.paused = False
+
+        if hasattr(self, "pause_button"):
+            self.pause_button.configure(text="Pause")
+
+        self.canvas.itemconfig(self.canvas_text, fill="white")
+        self.update_label()
+
+
+    def set_time_from_input(self, value: str):
+        normalized = normalize_time_input(value)
+        if not is_valid_hhmm(normalized):
+            raise ValueError("Ugyldig tid. Bruk MM:SS.")
+        self.set_time_seconds(hhmm_to_seconds(normalized))
+
+
+    if __name__ == "__main__":
+        ctk.set_appearance_mode('dark')
+        root = ctk.CTk()
+        root.title('Timer')
+        timer = Timer(master=root, initial_time=20, timer_label='Timer')
+        root.mainloop()
