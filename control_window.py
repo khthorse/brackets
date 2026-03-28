@@ -6,7 +6,7 @@ from PIL import Image, ImageTk
 
 from models import GroupStageModel, Team
 from team_io import parse_team_file, teams_from_text
-from time_utils import normalize_time_input, is_valid_hhmm
+from time_utils import normalize_time_input, is_valid_hhmm, hhmm_to_seconds
 
 class ControlWindow(ctk.CTkToplevel):
     """
@@ -90,8 +90,41 @@ class ControlWindow(ctk.CTkToplevel):
             ctk.CTkButton(
                 row,
                 text="Endre tid",
-                command=lambda t=timer: t.open_change_time_popup()
+                command=lambda t=timer: self.change_timer_time(t)
             ).pack(side="right", padx=4)
+
+    def change_timer_time(self, timer):
+        top = self._make_dialog("Endre tid", width=360, height=220)
+
+        ctk.CTkLabel(top, text="Skriv inn ny tid (MM:SS):").pack(pady=(20, 8))
+
+        entry = ctk.CTkEntry(top, width=140)
+        entry.pack(pady=6)
+
+        err_lbl = ctk.CTkLabel(top, text="", text_color="tomato")
+        err_lbl.pack(pady=(6, 0))
+
+        def save(event=None):
+            new_time = normalize_time_input(entry.get())
+            if not is_valid_hhmm(new_time):
+                err_lbl.configure(text="Ugyldig tid. Bruk MM:SS.")
+                return
+
+            timer.current_time = hhmm_to_seconds(new_time)
+            timer.initial_time = timer.current_time
+            timer.canvas.itemconfig(timer.canvas_text, fill="white")
+            timer.update_label()
+            top.destroy()
+
+        btn_row = ctk.CTkFrame(top)
+        btn_row.pack(pady=16)
+
+        ctk.CTkButton(btn_row, text="Avbryt", command=top.destroy).pack(side="left", padx=6)
+        ctk.CTkButton(btn_row, text="Lagre", command=save).pack(side="left", padx=6)
+
+        entry.bind("<Return>", save)
+        top.bind("<Escape>", lambda _e: top.destroy())
+        top.after(50, lambda: entry.focus_force())
 
     def _make_dialog(self, title, width=350, height=220):
         top = ctk.CTkToplevel(self)
