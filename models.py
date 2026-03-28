@@ -205,6 +205,8 @@ class GroupStageModel:
         )
 
     def _apply_result(self, match, cups_left_team1, cups_left_team2, winner, sign=+1):
+        if cups_left_team1 == 0 and cups_left_team2 == 0:
+            raise ValueError("0:0 er ikke et gyldig resultat.")
         team1 = next(t for t in self.teams if t.name == match.team1.name)
         team2 = next(t for t in self.teams if t.name == match.team2.name)
 
