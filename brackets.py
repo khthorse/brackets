@@ -583,15 +583,20 @@ class ControlWindow(ctk.CTkToplevel):
         base = Path(filepath).parent
 
         def split_smart(line: str):
-            try:
-                for row in csv.reader([line]):
-                    return [s.strip() for s in row]
-            except Exception:
-                pass
+            # Bruk csv.reader bare hvis linjen faktisk ser komma-separert ut
+            if "," in line:
+                try:
+                    for row in csv.reader([line]):
+                        if len(row) > 1:
+                            return [s.strip() for s in row]
+                except Exception:
+                    pass
 
-            for delim in [",", ";", "|", "\t"]:
+            # Fallback for andre skilletegn
+            for delim in [";", "|", "\t"]:
                 if delim in line:
                     return [s.strip() for s in line.split(delim)]
+
             return [line.strip()]
 
         with open(filepath, "r", encoding="utf-8-sig") as f:
@@ -606,11 +611,16 @@ class ControlWindow(ctk.CTkToplevel):
                 continue
 
             parts = split_smart(line)
+
             if len(parts) == 1:
-                name = parts[0]
+                name = parts[0].strip()
                 logo = None
             else:
-                name, logo = parts[0], (parts[1] or None)
+                name = parts[0].strip()
+                logo = parts[1].strip() if parts[1] else None
+
+            if logo:
+                logo = logo.strip('"').strip("'")
 
             if not name:
                 continue
