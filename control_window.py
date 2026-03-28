@@ -70,10 +70,10 @@ class ControlWindow(ctk.CTkToplevel):
             ctk.CTkLabel(row, text=f"Bord {i}").pack(side="left", padx=8)
 
             time_frame = ctk.CTkFrame(
-                row,
-                fg_color="#1f1f1f",   # mørkere bakgrunn
-                corner_radius=8
-            )
+                    row,
+                    fg_color="#1f1f1f",   # mørkere bakgrunn
+                    corner_radius=8
+                )
             time_frame.pack(side="left", padx=8, pady=2)
 
             time_label = ctk.CTkLabel(
@@ -106,10 +106,16 @@ class ControlWindow(ctk.CTkToplevel):
             ).pack(side="right", padx=4)
 
             def update_timer_info(t=timer, tl=time_label, sl=status_label, pb=primary_button):
-                tl.configure(text=t.get_display_time())
+                color = t.get_time_color()
+
+                tl.configure(
+                    text=t.get_display_time(),
+                    text_color=(color, color)
+                )
                 sl.configure(text=t.get_status_text())
                 pb.configure(text=t.get_primary_button_text())
-                self.after(500, lambda: update_timer_info(t, tl, sl, pb))
+
+                self.after(10, lambda: update_timer_info(t, tl, sl, pb))
 
             update_timer_info()
 

@@ -198,6 +198,18 @@ class Timer:
             return "Pause"
         return "Start"
     
+    def get_time_color(self) -> str:
+        if self.initial_time > 0:
+            fraction_left = max(self.current_time, 0) / self.initial_time
+        else:
+            fraction_left = 0
+
+        if fraction_left <= 0.05:
+            return "#ff4d4d"
+        elif fraction_left <= 0.1:
+            return "#ffaa33"
+        return "white"
+
 if __name__ == "__main__":
     ctk.set_appearance_mode('dark')
     root = ctk.CTk()
