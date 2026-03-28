@@ -106,17 +106,14 @@ class ControlWindow(ctk.CTkToplevel):
             ).pack(side="right", padx=4)
 
             def update_timer_info(t=timer, tl=time_label, sl=status_label, pb=primary_button):
-                color = t.get_time_color()
-
                 tl.configure(
                     text=t.get_display_time(),
-                    text_color=(color, color)
+                    text_color=(t.get_time_color(), t.get_time_color())
                 )
                 sl.configure(text=t.get_status_text())
                 pb.configure(text=t.get_primary_button_text())
 
-                self.after(10, lambda: update_timer_info(t, tl, sl, pb))
-
+            timer.add_observer(update_timer_info)
             update_timer_info()
 
     def change_timer_time(self, timer):
