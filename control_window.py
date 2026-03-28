@@ -12,12 +12,13 @@ class ControlWindow(ctk.CTkToplevel):
     Kontrollvinduet der du kan legge inn lag, sette vinnere, angi starttidspunkt
     og redigere kampoppsettet.
     """
-    def __init__(self, master, tournament_model, bracket_canvas, *args, **kwargs):
+    def __init__(self, master, tournament_model, bracket_canvas, timers=None, *args, **kwargs):
         super().__init__(master, *args, **kwargs)
         self.tournament_model = tournament_model
         self.bracket_canvas = bracket_canvas
         self.title("Kontrollvindu")
         self.geometry("1000x1200")
+        self.timers = timers or []
 
         team_entry_label = ctk.CTkLabel(self, text="Skriv inn lag (én per linje):")
         team_entry_label.pack(pady=5)
@@ -42,15 +43,54 @@ class ControlWindow(ctk.CTkToplevel):
 
         self.start_group_button = ctk.CTkButton(self, text="Start Gruppespill", command=self.start_group_stage)
         self.start_bracket_button = ctk.CTkButton(self, text="Start Sluttspill", command=self.build_final_bracket)
-        self.start_bracket_button.pack_forget()
-
         self.start_group_button.pack(pady=5)
+
+        self._build_timer_controls()
 
         self.match_controls_frame = ctk.CTkScrollableFrame(self)
         self.match_controls_frame.pack(fill="both", expand=True, pady=10)
 
         self.draw_match_controls()
         self.teams = []
+
+    def _build_timer_controls(self):
+        if not self.timers:
+            return
+
+        timer_section = ctk.CTkFrame(self)
+        timer_section.pack(fill="x", padx=10, pady=10)
+
+        ctk.CTkLabel(timer_section, text="Timerkontroll", font=("Arial", 20)).pack(pady=6)
+
+        for i, timer in enumerate(self.timers, start=1):
+            row = ctk.CTkFrame(timer_section)
+            row.pack(fill="x", padx=6, pady=4)
+
+            ctk.CTkLabel(row, text=f"Bord {i}").pack(side="left", padx=8)
+
+            ctk.CTkButton(
+                row,
+                text="Start",
+                command=lambda t=timer: t.countdown()
+            ).pack(side="right", padx=4)
+
+            ctk.CTkButton(
+                row,
+                text="Pause/Resume",
+                command=lambda t=timer: t.toggle_pause()
+            ).pack(side="right", padx=4)
+
+            ctk.CTkButton(
+                row,
+                text="Reset",
+                command=lambda t=timer: t.reset_timer()
+            ).pack(side="right", padx=4)
+
+            ctk.CTkButton(
+                row,
+                text="Endre tid",
+                command=lambda t=timer: t.open_change_time_popup()
+            ).pack(side="right", padx=4)
 
     def _make_dialog(self, title, width=350, height=220):
         top = ctk.CTkToplevel(self)

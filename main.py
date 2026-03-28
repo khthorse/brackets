@@ -68,16 +68,23 @@ tournament_model = TournamentModel()
 
 bracket_frame = TournamentBracketCanvas(master=main_frame, tournament_model=tournament_model)
 
-control_window = ControlWindow(master=main_frame, tournament_model=tournament_model, bracket_canvas=bracket_frame)
-
-
 # Timer 1
 timer_label = ctk.CTkLabel(master=timer_frame, text='Countdown Timer', font=('Arial', 40))
 timer_label.pack(pady=12, padx=10)
 
-timer1 = Timer(master=timer_frame, initial_time=60*15, timer_label='Bord 1')
+timer1 = Timer(master=timer_frame, initial_time=60*15, timer_label='Bord 1', show_controls=False)
 
-timer2 = Timer(master=timer_frame, initial_time=60*15, timer_label='Bord 2')
+timer2 = Timer(master=timer_frame, initial_time=60*15, timer_label='Bord 2', show_controls=False)
+
+
+control_window = ControlWindow(
+    master=main_frame,
+    tournament_model=tournament_model,
+    bracket_canvas=bracket_frame,
+    timers=[timer1, timer2]
+)
+
+
 
 
 #fullscreen_button = ctk.CTkButton(master=timer_frame, text='Fullskjerm', command=fullscreen())
