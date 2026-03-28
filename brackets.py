@@ -1,14 +1,12 @@
 
-import csv
-
 import customtkinter as ctk
 import tkinter.filedialog as fd
 import tkinter as tk
 
 from PIL import Image, ImageTk
-from pathlib import Path
 
 from models import TournamentModel, GroupStageModel, Team
+from team_io import parse_team_file, teams_from_text
 
 
 class TournamentBracketCanvas(ctk.CTkFrame):
@@ -578,67 +576,6 @@ class ControlWindow(ctk.CTkToplevel):
         top.after(50, lambda: e1.focus_force())
         top.wait_window()
 
-    def _parse_team_file(self, filepath: str):
-        teams = []
-        base = Path(filepath).parent
-
-        def split_smart(line: str):
-            # Bruk csv.reader bare hvis linjen faktisk ser komma-separert ut
-            if "," in line:
-                try:
-                    for row in csv.reader([line]):
-                        if len(row) > 1:
-                            return [s.strip() for s in row]
-                except Exception:
-                    pass
-
-            # Fallback for andre skilletegn
-            for delim in [";", "|", "\t"]:
-                if delim in line:
-                    return [s.strip() for s in line.split(delim)]
-
-            return [line.strip()]
-
-        with open(filepath, "r", encoding="utf-8-sig") as f:
-            lines = f.read().splitlines()
-
-        if lines and ("name" in lines[0].lower() and "logo" in lines[0].lower()):
-            lines = lines[1:]
-
-        for raw in lines:
-            line = raw.strip()
-            if not line or line.startswith("#"):
-                continue
-
-            parts = split_smart(line)
-
-            if len(parts) == 1:
-                name = parts[0].strip()
-                logo = None
-            else:
-                name = parts[0].strip()
-                logo = parts[1].strip() if parts[1] else None
-
-            if logo:
-                logo = logo.strip('"').strip("'")
-
-            if not name:
-                continue
-
-            if logo:
-                p = Path(logo).expanduser()
-                if not p.is_absolute():
-                    p = (base / p).resolve()
-                logo = str(p)
-
-            teams.append(Team(name=name, logo=logo))
-
-        return teams
-
-    def _teams_from_textbox(self):
-        names = [ln.strip() for ln in self.team_text.get("1.0", "end").splitlines() if ln.strip()]
-        return [Team(name=n) for n in names]
-
     def load_teams_from_file(self):
         path = fd.askopenfilename(
             title="Velg lag-fil",
@@ -648,7 +585,7 @@ class ControlWindow(ctk.CTkToplevel):
             return
 
         try:
-            self.teams = self._parse_team_file(path)
+            self.teams = parse_team_file(path)
             if not self.teams:
                 raise ValueError("Fant ingen lag i fila.")
 
@@ -702,7 +639,7 @@ class ControlWindow(ctk.CTkToplevel):
 
             btn_time = ctk.CTkButton(
                 row, text="Sett tidspunkt",
-                command=lambda i=idx: self.set_group_match_timer(i)
+                command=lambda i=idx: self.set_group_match_time(i)
             )
             btn_time.pack(side="right", padx=4)
 
@@ -786,7 +723,7 @@ class ControlWindow(ctk.CTkToplevel):
         self.bracket_canvas.show_group_stage(self.group_stage_model)
         self.draw_group_match_controls()
 
-    def set_group_match_timer(self, match_index):
+    def set_group_match_time(self, match_index):
         top = self._make_dialog("Sett tidspunkt", width=360, height=220)
 
         ctk.CTkLabel(top, text="Tidspunkt (HH:MM):").pack(pady=(20, 8))
@@ -840,17 +777,18 @@ class ControlWindow(ctk.CTkToplevel):
 
     def fill_team_list(self):
         self.teams = []
-        team_names = [name.strip() for name in self.team_text.get("1.0", "end").splitlines() if name.strip()]
 
-        for name in team_names:
+        base_teams = teams_from_text(self.team_text.get("1.0", "end"))
+
+        for team in base_teams:
             logo_path = None
             if self.logo_switch:
                 logo_path = fd.askopenfilename(
-                    title=f"Velg logo for {name}",
+                    title=f"Velg logo for {team.name}",
                     filetypes=[("Image files", ".png .jpg .jpeg .gif")]
                 )
 
-            self.teams.append(Team(name=name, logo=logo_path))
+            self.teams.append(Team(name=team.name, logo=logo_path))
 
     def build_bracket(self):
         if not self.teams:
