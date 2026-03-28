@@ -133,16 +133,10 @@ class Timer:
         if not new_time:
             return
 
-        new_time = normalize_time_input(new_time)
-
-        if not is_valid_hhmm(new_time):
+        try:
+            self.set_time_from_input(new_time)
+        except ValueError:
             self.open_change_time_popup()
-            return
-
-        self.current_time = hhmm_to_seconds(new_time)
-        self.initial_time = self.current_time
-        self.canvas.itemconfig(self.canvas_text, fill="white")
-        self.update_label()
             
     def set_time_seconds(self, seconds: int):
         if hasattr(self, "start_button"):
@@ -182,11 +176,31 @@ class Timer:
         if self.timer_id is not None:
             return "Kjører"
         return "Klar"
+    
+    def primary_action(self):
+        if self.current_time < 0:
+            self.reset_timer()
+            self.countdown()
+        elif self.paused:
+            self.toggle_pause()
+        elif self.timer_id is not None:
+            self.toggle_pause()
+        else:
+            self.countdown()
 
 
-    if __name__ == "__main__":
-        ctk.set_appearance_mode('dark')
-        root = ctk.CTk()
-        root.title('Timer')
-        timer = Timer(master=root, initial_time=20, timer_label='Timer')
-        root.mainloop()
+    def get_primary_button_text(self) -> str:
+        if self.current_time < 0:
+            return "Start"
+        if self.paused:
+            return "Resume"
+        if self.timer_id is not None:
+            return "Pause"
+        return "Start"
+    
+if __name__ == "__main__":
+    ctk.set_appearance_mode('dark')
+    root = ctk.CTk()
+    root.title('Timer')
+    timer = Timer(master=root, initial_time=20, timer_label='Timer')
+    root.mainloop()

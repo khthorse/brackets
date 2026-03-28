@@ -69,30 +69,29 @@ class ControlWindow(ctk.CTkToplevel):
 
             ctk.CTkLabel(row, text=f"Bord {i}").pack(side="left", padx=8)
 
-            time_label = ctk.CTkLabel(row, text="")
-            time_label.pack(side="left", padx=8)
+            time_frame = ctk.CTkFrame(
+                row,
+                fg_color="#1f1f1f",   # mørkere bakgrunn
+                corner_radius=8
+            )
+            time_frame.pack(side="left", padx=8, pady=2)
+
+            time_label = ctk.CTkLabel(
+                time_frame,
+                text="00:00",
+                font=("Consolas", 22)  # monospace + større
+            )
+            time_label.pack(padx=10, pady=4)
 
             status_label = ctk.CTkLabel(row, text="")
             status_label.pack(side="left", padx=8)
 
-            def update_timer_info(t=timer, tl=time_label, sl=status_label):
-                tl.configure(text=t.get_display_time())
-                sl.configure(text=t.get_status_text())
-                self.after(500, lambda: update_timer_info(t, tl, sl))
-
-            update_timer_info()
-
-            ctk.CTkButton(
+            primary_button = ctk.CTkButton(
                 row,
-                text="Start",
-                command=lambda t=timer: t.countdown()
-            ).pack(side="right", padx=4)
-
-            ctk.CTkButton(
-                row,
-                text="Pause/Resume",
-                command=lambda t=timer: t.toggle_pause()
-            ).pack(side="right", padx=4)
+                text=timer.get_primary_button_text(),
+                command=lambda t=timer: t.primary_action()
+            )
+            primary_button.pack(side="right", padx=4)
 
             ctk.CTkButton(
                 row,
@@ -105,6 +104,14 @@ class ControlWindow(ctk.CTkToplevel):
                 text="Endre tid",
                 command=lambda t=timer: self.change_timer_time(t)
             ).pack(side="right", padx=4)
+
+            def update_timer_info(t=timer, tl=time_label, sl=status_label, pb=primary_button):
+                tl.configure(text=t.get_display_time())
+                sl.configure(text=t.get_status_text())
+                pb.configure(text=t.get_primary_button_text())
+                self.after(500, lambda: update_timer_info(t, tl, sl, pb))
+
+            update_timer_info()
 
     def change_timer_time(self, timer):
         top = self._make_dialog("Endre tid", width=360, height=220)
