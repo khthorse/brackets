@@ -78,11 +78,14 @@ class Timer:
         """Kjører nedtellingen og planlegger oppdateringer hvert sekund."""
         if hasattr(self, "start_button"):
             self.start_button.configure(state=ctk.DISABLED)
+
         if self.current_time >= 0 and not self.paused:
-            self.update_label()
+            self.update_label() 
             self.current_time -= 1
             self.timer_id = self.master.after(1000, self.countdown)
+
         if self.current_time < 0:
+            self.timer_id = None
             self.canvas.itemconfig(self.canvas_text, text="Ferdig!", fill="#B46246")
             self.canvas.itemconfig(self.arc, extent=-359.999)
 
@@ -92,6 +95,7 @@ class Timer:
             self.paused = True
             if self.timer_id:
                 self.master.after_cancel(self.timer_id)
+                self.timer_id = None
             if hasattr(self, "pause_button"):
                 self.pause_button.configure(text="Resume")
         else:
@@ -104,13 +108,18 @@ class Timer:
         """Resetter timeren til startverdien."""
         if hasattr(self, "start_button"):
             self.start_button.configure(state=ctk.NORMAL)
+
         if self.timer_id:
             self.master.after_cancel(self.timer_id)
+            self.timer_id = None
+
         self.current_time = self.initial_time
         self.paused = False
+
         if hasattr(self, "pause_button"):
             self.pause_button.configure(text="Pause")
-        self.canvas.itemconfig(self.canvas_text, fill='white')
+
+        self.canvas.itemconfig(self.canvas_text, fill="white")
         self.update_label()
         
     def open_change_time_popup(self):

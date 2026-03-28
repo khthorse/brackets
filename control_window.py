@@ -69,6 +69,29 @@ class ControlWindow(ctk.CTkToplevel):
 
             ctk.CTkLabel(row, text=f"Bord {i}").pack(side="left", padx=8)
 
+            time_label = ctk.CTkLabel(row, text="")
+            time_label.pack(side="left", padx=8)
+
+            status_label = ctk.CTkLabel(row, text="")
+            status_label.pack(side="left", padx=8)
+
+            def update_timer_info(t=timer, tl=time_label, sl=status_label):
+                minutes, seconds = divmod(max(t.current_time, 0), 60)
+                tl.configure(text=f"{minutes:02d}:{seconds:02d}")
+
+                if t.current_time < 0:
+                    sl.configure(text="Ferdig")
+                elif t.paused:
+                    sl.configure(text="Pause")
+                elif t.timer_id is not None:
+                    sl.configure(text="Kjører")
+                else:
+                    sl.configure(text="Klar")
+
+                self.after(500, lambda: update_timer_info(t, tl, sl))
+
+            update_timer_info()
+
             ctk.CTkButton(
                 row,
                 text="Start",
@@ -110,6 +133,7 @@ class ControlWindow(ctk.CTkToplevel):
                 err_lbl.configure(text="Ugyldig tid. Bruk MM:SS.")
                 return
 
+            timer.reset_timer()
             timer.current_time = hhmm_to_seconds(new_time)
             timer.initial_time = timer.current_time
             timer.canvas.itemconfig(timer.canvas_text, fill="white")
