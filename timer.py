@@ -1,5 +1,7 @@
 import customtkinter as ctk
 
+from time_utils import normalize_time_input, is_valid_hhmm, hhmm_to_seconds
+
 class Timer:
     def __init__(self, master, initial_time, timer_label, show_controls=True):
         self.master = master
@@ -115,7 +117,6 @@ class Timer:
         popup = ctk.CTkInputDialog(title="Change Time", text="enter new time:  mm:ss")
         new_time = popup.get_input()
 
-        # Bruker avbrøt dialogen
         if new_time is None:
             return
 
@@ -123,26 +124,16 @@ class Timer:
         if not new_time:
             return
 
-        if len(new_time) == 2:
-            new_time = "00:" + new_time
+        new_time = normalize_time_input(new_time)
 
-        elif len(new_time) == 3:
-            new_time = new_time[:1] + ":" + new_time[1:]
-
-        elif len(new_time) == 4:
-            if new_time[1] == ":":
-                new_time = "0" + new_time
-            else:
-                new_time = new_time[:2] + ":" + new_time[2:]
-
-        try:
-            minutes, seconds = map(int, new_time.split(":"))
-            self.current_time = minutes * 60 + seconds
-            self.initial_time = self.current_time
-            self.canvas.itemconfig(self.canvas_text, fill="white")
-            self.update_label()
-        except ValueError:
+        if not is_valid_hhmm(new_time):
             self.open_change_time_popup()
+            return
+
+        self.current_time = hhmm_to_seconds(new_time)
+        self.initial_time = self.current_time
+        self.canvas.itemconfig(self.canvas_text, fill="white")
+        self.update_label()
             
 if __name__ == "__main__":
     ctk.set_appearance_mode('dark')
