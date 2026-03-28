@@ -6,6 +6,7 @@ from PIL import Image, ImageTk
 
 from models import GroupStageModel, Team
 from team_io import parse_team_file, teams_from_text
+from time_utils import normalize_time_input, is_valid_hhmm
 
 class ControlWindow(ctk.CTkToplevel):
     """
@@ -386,8 +387,8 @@ class ControlWindow(ctk.CTkToplevel):
         err_lbl.pack(pady=(6, 0))
 
         def save(event=None):
-            new_time = self._normalize_time(entry.get())
-            if not self._is_valid_time(new_time):
+            new_time = normalize_time_input(entry.get())
+            if not is_valid_hhmm(new_time):
                 err_lbl.configure(text="Ugyldig klokkeslett. Bruk HH:MM.")
                 return
 
@@ -516,43 +517,6 @@ class ControlWindow(ctk.CTkToplevel):
         self.draw_match_controls()
         self.bracket_canvas.refresh()
 
-    def _normalize_time(self, value: str) -> str:
-        value = value.strip()
-
-        # Hvis allerede format HH:MM → returner direkte
-        if ":" in value:
-            return value
-
-        # Kun tall → tolk smart
-        if value.isdigit():
-            if len(value) <= 2:
-                # "8" → "08:00"
-                return f"{int(value):02d}:00"
-
-            elif len(value) == 3:
-                # "800" → "08:00", "930" → "09:30"
-                h = int(value[0])
-                m = int(value[1:])
-                return f"{h:02d}:{m:02d}"
-
-            elif len(value) == 4:
-                # "1330" → "13:30"
-                h = int(value[:2])
-                m = int(value[2:])
-                return f"{h:02d}:{m:02d}"
-
-        return value
-
-    def _is_valid_time(self, value: str) -> bool:
-        if len(value) != 5 or value[2] != ":":
-            return False
-        hh, mm = value.split(":")
-        if not (hh.isdigit() and mm.isdigit()):
-            return False
-        hh = int(hh)
-        mm = int(mm)
-        return 0 <= hh <= 23 and 0 <= mm <= 59
-
     def set_start_time(self, round_index, match_index):
         top = self._make_dialog("Sett starttid", width=360, height=220)
 
@@ -565,8 +529,8 @@ class ControlWindow(ctk.CTkToplevel):
         err_lbl.pack(pady=(6, 0))
 
         def save(event=None):
-            new_time = self._normalize_time(entry.get())
-            if not self._is_valid_time(new_time):
+            new_time = normalize_time_input(entry.get())
+            if not is_valid_hhmm(new_time):
                 err_lbl.configure(text="Ugyldig klokkeslett. Bruk HH:MM.")
                 return
 
