@@ -6,7 +6,7 @@ from PIL import Image, ImageTk
 
 from models import GroupStageModel, Team
 from team_io import parse_team_file, teams_from_text
-from time_utils import normalize_time_input, is_valid_hhmm, hhmm_to_seconds
+from time_utils import normalize_time_input, is_valid_hhmm
 
 class ControlWindow(ctk.CTkToplevel):
     """
@@ -106,13 +106,15 @@ class ControlWindow(ctk.CTkToplevel):
             ).pack(side="right", padx=4)
 
             def update_timer_info(t=timer, tl=time_label, sl=status_label, pb=primary_button):
+                if not (tl.winfo_exists() and sl.winfo_exists() and pb.winfo_exists()):
+                    return
+
                 tl.configure(
                     text=t.get_display_time(),
                     text_color=(t.get_time_color(), t.get_time_color())
                 )
                 sl.configure(text=t.get_status_text())
                 pb.configure(text=t.get_primary_button_text())
-
             timer.add_observer(update_timer_info)
             update_timer_info()
 

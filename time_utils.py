@@ -36,7 +36,19 @@ def is_valid_hhmm(value: str) -> bool:
     mm = int(mm)
     return 0 <= hh <= 23 and 0 <= mm <= 59
 
+def is_valid_mmss(value: str) -> bool:
+    if len(value) != 5 or value[2] != ":":
+        return False
 
-def hhmm_to_seconds(value: str) -> int:
-    hh, mm = map(int, value.split(":"))
-    return hh * 60 + mm
+    mm, ss = value.split(":")
+    if not (mm.isdigit() and ss.isdigit()):
+        return False
+
+    mm = int(mm)
+    ss = int(ss)
+    return 0 <= mm <= 59 and 0 <= ss <= 59
+
+
+def mmss_to_seconds(value: str) -> int:
+    mm, ss = map(int, value.split(":"))
+    return mm * 60 + ss

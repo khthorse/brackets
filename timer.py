@@ -1,8 +1,14 @@
 import time
+import threading
+import os
 import customtkinter as ctk
 
-from time_utils import normalize_time_input, is_valid_hhmm, hhmm_to_seconds
+from time_utils import normalize_time_input, is_valid_mmss, mmss_to_seconds
 
+try:
+    import winsound
+except ImportError:
+    winsound = None
 
 class Timer:
     def __init__(self, master, initial_time, timer_label, show_controls=True):
@@ -86,8 +92,31 @@ class Timer:
         self._observers.append(callback)
 
     def _notify_observers(self):
+        alive_callbacks = []
+
         for callback in self._observers:
-            callback()  
+            try:
+                callback()
+                alive_callbacks.append(callback)
+            except TclError:
+                pass
+
+        self._observers = alive_callbacks
+
+    def _play_alarm(self):
+        if winsound is None:
+            return
+
+        try:
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            sound_path = os.path.join(base_dir, "sounds", "bottle_alarm.wav")
+            winsound.PlaySound(sound_path, winsound.SND_FILENAME)
+        except Exception as e:
+            print("Kunne ikke spille lyd:", e)
+
+
+    def _play_alarm_async(self):
+        threading.Thread(target=self._play_alarm, daemon=True).start()
 
     def update_label(self):
         """Oppdaterer tekst og progress-bue basert på gjenværende tid."""
@@ -99,19 +128,31 @@ class Timer:
         if self.initial_time > 0:
             progress = (self.initial_time - remaining) / self.initial_time
         else:
-            progress = 0
+            progress = 0.0
 
+        progress = max(0.0, min(1.0, progress))
         ext = -progress * 360
 
         color = self.get_time_color()
 
-
         pulse = self._pulse_factor()
         arc_width = 15 + pulse * 3
 
-        self.canvas.itemconfig(self.arc, extent=ext, outline=color, width=arc_width)
-        self.canvas.itemconfig(self.canvas_text, text=time_str, fill=color)
+        # Ikke tegn bue før den er stor nok til å se pen ut
+        if self.initial_time > 30:
+            if abs(ext) < 0.3:
+                self.canvas.itemconfig(self.arc, extent=0, outline="#2b2b2b", width=15)
+            else:
+                self.canvas.itemconfig(self.arc, extent=ext, outline=color, width=arc_width)
+        else:
+            if progress == 0:
+                self.canvas.itemconfig(self.arc, extent=0, outline="#2b2b2b", width=15)
+            elif abs(ext) < 8:
+                self.canvas.itemconfig(self.arc, extent=-8, outline=color, width=arc_width)
+            else:
+                self.canvas.itemconfig(self.arc, extent=ext, outline=color, width=arc_width)
 
+        self.canvas.itemconfig(self.canvas_text, text=time_str, fill=color)
 
         self._notify_observers()
 
@@ -165,6 +206,7 @@ class Timer:
         self.canvas.itemconfig(self.canvas_text, text="Ferdig!", fill=color)
         self.canvas.itemconfig(self.arc, extent=-359.999, outline=color, width=15)
 
+        self._play_alarm_async()
         self._start_finished_blink()
 
         self._notify_observers()
@@ -258,9 +300,9 @@ class Timer:
 
     def set_time_from_input(self, value: str):
         normalized = normalize_time_input(value)
-        if not is_valid_hhmm(normalized):
+        if not is_valid_mmss(normalized):
             raise ValueError("Ugyldig tid. Bruk MM:SS.")
-        self.set_time_seconds(hhmm_to_seconds(normalized))
+        self.set_time_seconds(mmss_to_seconds(normalized))
 
     def get_display_time(self) -> str:
         remaining = max(self.current_time, 0)
