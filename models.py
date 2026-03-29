@@ -29,7 +29,8 @@ class Match:
 
 
 class TournamentModel:
-    def __init__(self):
+    def __init__(self, settings=None):
+        self.settings = settings
         self.loaded_teams = []
         self.teams: list[Team] = []
         self.rounds: list[list[Match]] = []
@@ -52,7 +53,8 @@ class TournamentModel:
                     team_objs.append(Team(name=name))
 
         teams_shuffled = team_objs[:]
-        random.shuffle(teams_shuffled)
+        if self.settings is None or self.settings.shuffle_teams:
+            random.shuffle(teams_shuffled)
         self.teams = teams_shuffled
 
         n = len(self.teams)

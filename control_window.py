@@ -14,10 +14,12 @@ class ControlWindow(ctk.CTkToplevel):
     Kontrollvinduet der du kan legge inn lag, sette vinnere, angi starttidspunkt
     og redigere kampoppsettet.
     """
-    def __init__(self, master, tournament_model, bracket_canvas, timers=None, *args, **kwargs):
+    def __init__(self, master, tournament_model, bracket_canvas, timers=None, settings=None, *args, **kwargs):
         super().__init__(master, *args, **kwargs)
         self.tournament_model = tournament_model
         self.bracket_canvas = bracket_canvas
+        self.settings = settings
+
         self.title(t("control_window_title"))
         self.geometry("900x1080")
         self.timers = timers or []
@@ -39,7 +41,7 @@ class ControlWindow(ctk.CTkToplevel):
         load_from_file_btn = ctk.CTkButton(self, text=t("load_teams_from_file"), command=self.load_teams_from_file)
         load_from_file_btn.pack(pady=5)
 
-        self.logo_switch = False
+        self.logo_switch = settings.ask_for_logos if settings is not None else False
         load_logo_checkbox = ctk.CTkCheckBox(self, text=t("add_team_logos"), command=self.toggle_load_logo)
         load_logo_checkbox.pack(pady=5)
 

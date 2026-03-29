@@ -12,11 +12,12 @@ class TournamentBracketCanvas(ctk.CTkFrame):
     Linjene trekkes i tre segmenter: horisontalt fra barnets boks, så vertikalt,
     og horisontalt til den nye boksen.
     """
-    def __init__(self, master, tournament_model, *args, **kwargs):
+    def __init__(self, master, tournament_model, settings=None, *args, **kwargs):
         super().__init__(master, *args, border_width=0, fg_color="#2b2b2b", **kwargs)
         self.tournament_model = tournament_model
-        self.pack(fill="both", expand=True)
+        self.settings = settings
 
+        self.pack(fill="both", expand=True)
         canvas_bg = "#2B2B2B"
         self.canvas = tk.Canvas(self, bg=canvas_bg, highlightthickness=0, bd=0)
         self.canvas.pack(fill="both", expand=True)

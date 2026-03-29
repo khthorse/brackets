@@ -15,11 +15,12 @@ except ImportError:
     winsound = None
 
 class Timer:
-    def __init__(self, master, initial_time, timer_label, show_controls=True):
+    def __init__(self, master, initial_time, timer_label, show_controls=True, settings=None):
         self.master = master
+        self.settings = settings
         self.initial_time = initial_time
         self.current_time = initial_time
-        self.muted = False
+        self.muted = settings.default_muted if settings is not None else False
         self.paused = False
         self.timer_id = None
         self.show_controls = show_controls
@@ -116,9 +117,12 @@ class Timer:
         return t("mute_on") if self.muted else t("mute_off")
 
     def _play_alarm(self):
+        if self.settings is not None and not self.settings.alarm_enabled:
+            return
+
         if self.muted:
             return
-        
+            
         if winsound is None:
             return
 
@@ -149,7 +153,7 @@ class Timer:
 
         color = self.get_time_color()
 
-        pulse = self._pulse_factor()
+        pulse = self._pulse_factor() if (self.settings is None or self.settings.pulse_enabled) else 0.0
         arc_width = 15 + pulse * 3
 
         # Ikke tegn bue før den er stor nok til å se pen ut
@@ -221,7 +225,9 @@ class Timer:
         self.canvas.itemconfig(self.arc, extent=-359.999, outline=color, width=15)
 
         self._play_alarm_async()
-        self._start_finished_blink()
+
+        if self.settings is None or self.settings.blink_enabled:
+            self._start_finished_blink()
 
         self._notify_observers()
 
