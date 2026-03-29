@@ -3,6 +3,8 @@ import random
 from dataclasses import dataclass
 from typing import Optional
 
+from translations import t
+
 
 @dataclass
 class Team:
@@ -135,7 +137,7 @@ class GroupStageModel:
         random.shuffle(teams_shuffled)
 
         n = len(teams_shuffled)
-        assert n % 2 == 0, "Antall lag bør være partall for dette oppsettet."
+        assert n % 2 == 0, t("even_number_of_teams_required")
 
         round1 = []
         for i in range(0, n, 2):
@@ -206,7 +208,7 @@ class GroupStageModel:
 
     def _apply_result(self, match, cups_left_team1, cups_left_team2, winner, sign=+1):
         if cups_left_team1 == 0 and cups_left_team2 == 0:
-            raise ValueError("0:0 er ikke et gyldig resultat.")
+            raise ValueError(t("invalid_score_zero_zero"))
         team1 = next(t for t in self.teams if t.name == match.team1.name)
         team2 = next(t for t in self.teams if t.name == match.team2.name)
 
@@ -216,12 +218,12 @@ class GroupStageModel:
         # Poenglogikk
         if cups_left_team1 > cups_left_team2:
             if winner != 1:
-                raise ValueError("Ugyldig kombinasjon av kopper/vinner")
+                raise ValueError(t("invalid_cups_winner_combo"))
             team1.points += 2 * sign
 
         elif cups_left_team2 > cups_left_team1:
             if winner != 2:
-                raise ValueError("Ugyldig kombinasjon av kopper/vinner")
+                raise ValueError(t("invalid_cups_winner_combo"))
             team2.points += 2 * sign
 
         else:
@@ -235,7 +237,7 @@ class GroupStageModel:
             elif winner == 2:
                 team2.points += 1 * sign
             else:
-                raise ValueError("Ugyldig tie-break kombinasjon")
+                raise ValueError(t("invalid_tiebreak_combo"))
 
         # Statistikk
         team1.cups_hit += cups_hit_team1 * sign

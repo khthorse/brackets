@@ -9,18 +9,19 @@ import os
 from models import TournamentModel
 from bracket_canvas import TournamentBracketCanvas
 from control_window import ControlWindow
+from translations import t
 
 
 def find_time():
     year = str(time.localtime().tm_year)
     month = time.localtime().tm_mon
-    
+
     if month <= 6:
-        sem = 'Vår '
+        sem = t("spring")
     else:
-        sem = 'Høst '
-        
-    return sem + year
+        sem = t("autumn")
+
+    return f"{sem} {year}"
 
 
 ctk.set_appearance_mode('dark')
@@ -30,7 +31,7 @@ ctk.set_appearance_mode('dark')
 
 #root window
 root = ctk.CTk()
-root.title('Beerpong Turnering ' + find_time())
+root.title(t("app_title").format(semester=find_time()))
 root.geometry('1920x1280')
 
 #root.state('zoomed')
@@ -53,7 +54,11 @@ main_frame.grid(row=0, column=1, sticky='nsew', padx=10, pady=10)
 
 # brackets
 
-brackets_label = ctk.CTkLabel(master=main_frame, text='Beerpong Turnering '+ find_time(), font=('Arial', 40))
+brackets_label = ctk.CTkLabel(
+    master=main_frame,
+    text=t("app_title").format(semester=find_time()),
+    font=("Arial", 40)
+)
 brackets_label.pack(pady=12, padx=10)
 
 tournament_model = TournamentModel()
@@ -61,12 +66,22 @@ tournament_model = TournamentModel()
 bracket_frame = TournamentBracketCanvas(master=main_frame, tournament_model=tournament_model)
 
 # Timer 1
-timer_label = ctk.CTkLabel(master=timer_frame, text='Countdown Timer', font=('Arial', 40))
+timer_label = ctk.CTkLabel(master=timer_frame, text=t("countdown_timer"), font=("Arial", 40))
 timer_label.pack(pady=12, padx=10)
 
-timer1 = Timer(master=timer_frame, initial_time=60*15, timer_label='Bord 1', show_controls=False)
+timer1 = Timer(
+    master=timer_frame,
+    initial_time=60 * 15,
+    timer_label=t("table_label").format(index=1),
+    show_controls=False
+)
 
-timer2 = Timer(master=timer_frame, initial_time=60*15, timer_label='Bord 2', show_controls=False)
+timer2 = Timer(
+    master=timer_frame,
+    initial_time=60 * 15,
+    timer_label=t("table_label").format(index=2),
+    show_controls=False
+)
 
 
 control_window = ControlWindow(

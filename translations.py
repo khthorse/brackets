@@ -11,6 +11,7 @@ LANGUAGES = {
         "standings": "Tabell",
         "matches": "Kamper",
         "vs": "vs",
+        "matchup": "{team1} vs {team2}",
         "starts_at": "Starter: {time}",
         "tbd": "TBD",
 
@@ -115,6 +116,7 @@ LANGUAGES = {
         "standings": "Standings",
         "matches": "Matches",
         "vs": "vs",
+        "matchup": "{team1} vs {team2}",
         "starts_at": "Starts: {time}",
         "tbd": "TBD",
 

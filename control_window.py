@@ -7,6 +7,7 @@ from PIL import Image, ImageTk
 from models import GroupStageModel, Team
 from team_io import parse_team_file, teams_from_text
 from time_utils import normalize_time_input, is_valid_hhmm
+from translations import t
 
 class ControlWindow(ctk.CTkToplevel):
     """
@@ -17,11 +18,11 @@ class ControlWindow(ctk.CTkToplevel):
         super().__init__(master, *args, **kwargs)
         self.tournament_model = tournament_model
         self.bracket_canvas = bracket_canvas
-        self.title("Kontrollvindu")
-        self.geometry("1000x1200")
+        self.title(t("control_window_title"))
+        self.geometry("900x1080")
         self.timers = timers or []
 
-        team_entry_label = ctk.CTkLabel(self, text="Skriv inn lag (én per linje):")
+        team_entry_label = ctk.CTkLabel(self, text=t("enter_teams_one_per_line"))
         team_entry_label.pack(pady=5)
 
         self.team_text = tk.Text(self, height=20, width=60)
@@ -32,18 +33,18 @@ class ControlWindow(ctk.CTkToplevel):
             "Lag 9\nLag 10\nLag 11\nLag 12\nLag 13\nLag 14\nLag 15\nLag 16"
         )
 
-        set_teams_button = ctk.CTkButton(self, text="Bygg Brakett", command=self.build_bracket)
+        set_teams_button = ctk.CTkButton(self, text=t("build_bracket"), command=self.build_bracket)
         set_teams_button.pack(pady=5)
 
-        load_from_file_btn = ctk.CTkButton(self, text="Last lag fra fil...", command=self.load_teams_from_file)
+        load_from_file_btn = ctk.CTkButton(self, text=t("load_teams_from_file"), command=self.load_teams_from_file)
         load_from_file_btn.pack(pady=5)
 
         self.logo_switch = False
-        load_logo_checkbox = ctk.CTkCheckBox(self, text="Legg til laglogoer", command=self.toggle_load_logo)
+        load_logo_checkbox = ctk.CTkCheckBox(self, text=t("add_team_logos"), command=self.toggle_load_logo)
         load_logo_checkbox.pack(pady=5)
 
-        self.start_group_button = ctk.CTkButton(self, text="Start Gruppespill", command=self.start_group_stage)
-        self.start_bracket_button = ctk.CTkButton(self, text="Start Sluttspill", command=self.build_final_bracket)
+        self.start_group_button = ctk.CTkButton(self, text=t("start_group_stage"), command=self.start_group_stage)
+        self.start_bracket_button = ctk.CTkButton(self, text=t("start_playoffs"), command=self.build_final_bracket)
         self.start_group_button.pack(pady=5)
 
         self._build_timer_controls()
@@ -61,13 +62,13 @@ class ControlWindow(ctk.CTkToplevel):
         timer_section = ctk.CTkFrame(self)
         timer_section.pack(fill="x", padx=10, pady=10)
 
-        ctk.CTkLabel(timer_section, text="Timerkontroll", font=("Arial", 20)).pack(pady=6)
+        ctk.CTkLabel(timer_section, text=t("timer_controls"), font=("Arial", 20)).pack(pady=6)
 
         for i, timer in enumerate(self.timers, start=1):
             row = ctk.CTkFrame(timer_section)
             row.pack(fill="x", padx=6, pady=4)
 
-            ctk.CTkLabel(row, text=f"Bord {i}").pack(side="left", padx=8)
+            ctk.CTkLabel(row, text=t("table_label")).pack(side="left", padx=8)
 
             time_frame = ctk.CTkFrame(
                     row,
@@ -95,13 +96,13 @@ class ControlWindow(ctk.CTkToplevel):
 
             ctk.CTkButton(
                 row,
-                text="Reset",
+                text=t("reset"),
                 command=lambda t=timer: t.reset_timer()
             ).pack(side="right", padx=4)
 
             ctk.CTkButton(
                 row,
-                text="Endre tid",
+                text=t("change_time"),
                 command=lambda t=timer: self.change_timer_time(t)
             ).pack(side="right", padx=4)
 
@@ -127,9 +128,9 @@ class ControlWindow(ctk.CTkToplevel):
             update_timer_info()
 
     def change_timer_time(self, timer):
-        top = self._make_dialog("Endre tid", width=360, height=220)
+        top = self._make_dialog(t("change_time_title"), width=360, height=220)
 
-        ctk.CTkLabel(top, text="Skriv inn ny tid (MM:SS):").pack(pady=(20, 8))
+        ctk.CTkLabel(top, text=t("enter_new_time_mmss")).pack(pady=(20, 8))
 
         entry = ctk.CTkEntry(top, width=140)
         entry.pack(pady=6)
@@ -147,8 +148,8 @@ class ControlWindow(ctk.CTkToplevel):
         btn_row = ctk.CTkFrame(top)
         btn_row.pack(pady=16)
 
-        ctk.CTkButton(btn_row, text="Avbryt", command=top.destroy).pack(side="left", padx=6)
-        ctk.CTkButton(btn_row, text="Lagre", command=save).pack(side="left", padx=6)
+        ctk.CTkButton(btn_row, text=t("cancel"), command=top.destroy).pack(side="left", padx=6)
+        ctk.CTkButton(btn_row, text=t("save"), command=save).pack(side="left", padx=6)
 
         entry.bind("<Return>", save)
         top.bind("<Escape>", lambda _e: top.destroy())
@@ -188,7 +189,7 @@ class ControlWindow(ctk.CTkToplevel):
     def _show_message_dialog(self, title, message, width=320, height=140):
         top = self._make_dialog(title, width=width, height=height)
         ctk.CTkLabel(top, text=message, justify="center").pack(padx=20, pady=20)
-        ctk.CTkButton(top, text="OK", command=top.destroy).pack(pady=(0, 12))
+        ctk.CTkButton(top, text=t("ok"), command=top.destroy).pack(pady=(0, 12))
     
     def _set_dark_title_bar(self, window):
         try:
@@ -239,13 +240,13 @@ class ControlWindow(ctk.CTkToplevel):
         team1_name = match.team1.name
         team2_name = match.team2.name
 
-        top = self._make_dialog("Antall kopper igjen", width=320, height=420)
+        top = self._make_dialog(t("cups_remaining_title"), width=320, height=420)
 
-        ctk.CTkLabel(top, text=f"{team1_name} kopper igjen (0–10):").pack(pady=(12, 4))
+        ctk.CTkLabel(top, text=t("cups_remaining_for_team").format(team=team1_name)).pack(pady=(12, 4))
         e1 = ctk.CTkEntry(top, width=120)
         e1.pack(pady=4)
 
-        ctk.CTkLabel(top, text=f"{team2_name} kopper igjen (0–10):").pack(pady=(12, 4))
+        ctk.CTkLabel(top, text=t("cups_remaining_for_team").format(team=team2_name)).pack(pady=(12, 4))
         e2 = ctk.CTkEntry(top, width=120)
         e2.pack(pady=4)
 
@@ -257,7 +258,7 @@ class ControlWindow(ctk.CTkToplevel):
             c2_str = e2.get().strip()
 
             if c1_str == "" or c2_str == "":
-                err_lbl.configure(text="Fyll inn begge feltene.")
+                err_lbl.configure(text=t("fill_both_fields"))
                 return
 
             try:
@@ -278,8 +279,8 @@ class ControlWindow(ctk.CTkToplevel):
 
         btn_row = ctk.CTkFrame(top)
         btn_row.pack(pady=12)
-        ctk.CTkButton(btn_row, text="Avbryt", command=top.destroy).pack(side="left", padx=6)
-        ctk.CTkButton(btn_row, text="Lagre", command=do_save).pack(side="left", padx=6)
+        ctk.CTkButton(btn_row, text=t("cancel"), command=top.destroy).pack(side="left", padx=6)
+        ctk.CTkButton(btn_row, text=t("save"), command=do_save).pack(side="left", padx=6)
 
         e1.bind("<Return>", do_save)
         e2.bind("<Return>", do_save)
@@ -291,7 +292,7 @@ class ControlWindow(ctk.CTkToplevel):
 
     def load_teams_from_file(self):
         path = fd.askopenfilename(
-            title="Velg lag-fil",
+            title=t("choose_team_file"),
             filetypes=[("CSV/Tekst", "*.csv *.txt *.tsv"), ("Alle filer", "*.*")]
         )
         if not path:
@@ -300,16 +301,26 @@ class ControlWindow(ctk.CTkToplevel):
         try:
             self.teams = parse_team_file(path)
             if not self.teams:
-                raise ValueError("Fant ingen lag i fila.")
+                raise ValueError(t("no_teams_in_file"))
 
             self.team_text.delete("1.0", "end")
             self.team_text.insert("1.0", "\n".join(t.name for t in self.teams))
 
-            self._show_message_dialog("Lag lastet", f"Lastet {len(self.teams)} lag fra fil.", 280, 120)
+            self._show_message_dialog(
+                t("teams_loaded_title"),
+                t("teams_loaded_message").format(count=len(self.teams)),
+                280,
+                120
+            )
 
         except Exception as e:
-            print(f"Feil ved lasting av lag: {e}")
-            self._show_message_dialog("Feil", f"Kunne ikke lese filen.\n{e}", 360, 160)
+            print(f"Fault when loading teams: {e}")
+            self._show_message_dialog(
+                t("error_title"),
+                t("could_not_read_file").format(error=e),
+                360,
+                160
+            )
 
     def start_group_stage(self):
         if not self.teams:
@@ -328,7 +339,7 @@ class ControlWindow(ctk.CTkToplevel):
         for widget in self.match_controls_frame.winfo_children():
             widget.destroy()
 
-        ctk.CTkLabel(self.match_controls_frame, text="Gruppespillkontroller", font=("Arial", 20)).pack(pady=5)
+        ctk.CTkLabel(self.match_controls_frame, text=t("group_stage_controls"), font=("Arial", 20)).pack(pady=5)
 
         for idx, match in enumerate(self.group_stage_model.matches):
             row = ctk.CTkFrame(self.match_controls_frame)
@@ -336,34 +347,34 @@ class ControlWindow(ctk.CTkToplevel):
 
             t1 = match.team1.name
             t2 = match.team2.name
-            ctk.CTkLabel(row, text=f"{t1} vs {t2}").pack(side="left", padx=6)
+            ctk.CTkLabel(row, text=t("matchup").format(team1=t1, team2=t2)).pack(side="left", padx=6)
 
             btn_t1 = ctk.CTkButton(
-                row, text=f"{t1} vant",
+                row, text=t("team_won").format(team=t1),
                 command=lambda i=idx: self.set_group_winner_popup(i, 1)
             )
             btn_t1.pack(side="right", padx=4)
 
             btn_t2 = ctk.CTkButton(
-                row, text=f"{t2} vant",
+                row, text=t("team_won").format(team=t2),
                 command=lambda i=idx: self.set_group_winner_popup(i, 2)
             )
             btn_t2.pack(side="right", padx=4)
 
             btn_time = ctk.CTkButton(
-                row, text="Sett tidspunkt",
+                row, text=t("set_time"),
                 command=lambda i=idx: self.set_group_match_time(i)
             )
             btn_time.pack(side="right", padx=4)
 
             if match.played:
                 ctk.CTkButton(
-                    row, text="Rediger resultat",
+                    row, text=t("edit_result"),
                     command=lambda i=idx: self.edit_group_result(i)
                 ).pack(side="right", padx=4)
 
                 ctk.CTkButton(
-                    row, text="Angre resultat",
+                    row, text=t("undo_result"),
                     command=lambda i=idx: self.clear_group_result(i)
                 ).pack(side="right", padx=4)
 
@@ -373,14 +384,14 @@ class ControlWindow(ctk.CTkToplevel):
 
         update_standings_btn = ctk.CTkButton(
             self.match_controls_frame,
-            text="Oppdater tabell",
+            text=t("update_standings"),
             command=lambda: self.bracket_canvas.show_group_stage(self.group_stage_model)
         )
         update_standings_btn.pack(pady=10)
 
     def edit_group_result(self, match_index):
         match = self.group_stage_model.matches[match_index]
-        top = self._make_dialog("Rediger resultat", width=320, height=340)
+        top = self._make_dialog(t("edit_result_title"), width=320, height=340)
 
         t1 = match.team1.name
         t2 = match.team2.name
@@ -388,17 +399,17 @@ class ControlWindow(ctk.CTkToplevel):
         prev_c2 = match.team2_cups_left or 0
         prev_w = match.winner or 1
 
-        ctk.CTkLabel(top, text=f"{t1} kopper igjen (0–10):").pack(pady=(10, 4))
+        ctk.CTkLabel(top, text=t("cups_remaining_for_team").format(team=t1)).pack(pady=(10, 4))
         e1 = ctk.CTkEntry(top, width=120)
         e1.insert(0, str(prev_c1))
         e1.pack(pady=4)
 
-        ctk.CTkLabel(top, text=f"{t2} kopper igjen (0–10):").pack(pady=(10, 4))
+        ctk.CTkLabel(top, text=t("cups_remaining_for_team").format(team=t2)).pack(pady=(10, 4))
         e2 = ctk.CTkEntry(top, width=120)
         e2.insert(0, str(prev_c2))
         e2.pack(pady=4)
 
-        ctk.CTkLabel(top, text="Vinner:").pack(pady=(10, 4))
+        ctk.CTkLabel(top, text=t("winner_label")).pack(pady=(10, 4))
         winner_var = tk.IntVar(value=prev_w)
         ctk.CTkRadioButton(top, text=t1, variable=winner_var, value=1).pack()
         ctk.CTkRadioButton(top, text=t2, variable=winner_var, value=2).pack()
@@ -421,8 +432,8 @@ class ControlWindow(ctk.CTkToplevel):
 
         btn_row = ctk.CTkFrame(top)
         btn_row.pack(pady=10)
-        ctk.CTkButton(btn_row, text="Avbryt", command=top.destroy).pack(side="left", padx=6)
-        ctk.CTkButton(btn_row, text="Lagre", command=save).pack(side="left", padx=6)
+        ctk.CTkButton(btn_row, text=t("cancel"), command=top.destroy).pack(side="left", padx=6)
+        ctk.CTkButton(btn_row, text=t("save"), command=save).pack(side="left", padx=6)
 
         top.grab_set()
         top.focus()
@@ -437,9 +448,9 @@ class ControlWindow(ctk.CTkToplevel):
         self.draw_group_match_controls()
 
     def set_group_match_time(self, match_index):
-        top = self._make_dialog("Sett tidspunkt", width=360, height=220)
+        top = self._make_dialog(t("set_time"), width=360, height=220)
 
-        ctk.CTkLabel(top, text="Tidspunkt (HH:MM):").pack(pady=(20, 8))
+        ctk.CTkLabel(top, text=t("time_hhmm_label")).pack(pady=(20, 8))
 
         entry = ctk.CTkEntry(top, width=140)
         entry.pack(pady=6)
@@ -450,7 +461,7 @@ class ControlWindow(ctk.CTkToplevel):
         def save(event=None):
             new_time = normalize_time_input(entry.get())
             if not is_valid_hhmm(new_time):
-                err_lbl.configure(text="Ugyldig klokkeslett. Bruk HH:MM.")
+                err_lbl.configure(text=t("invalid_time_hhmm"))
                 return
 
             self.group_stage_model.matches[match_index].time = new_time
@@ -461,8 +472,8 @@ class ControlWindow(ctk.CTkToplevel):
         btn_row = ctk.CTkFrame(top)
         btn_row.pack(pady=16)
 
-        ctk.CTkButton(btn_row, text="Avbryt", command=top.destroy).pack(side="left", padx=6)
-        ctk.CTkButton(btn_row, text="Lagre", command=save).pack(side="left", padx=6)
+        ctk.CTkButton(btn_row, text=t("cancel"), command=top.destroy).pack(side="left", padx=6)
+        ctk.CTkButton(btn_row, text=t("save"), command=save).pack(side="left", padx=6)
 
         entry.bind("<Return>", save)
         top.bind("<Escape>", lambda _e: top.destroy())
@@ -470,7 +481,7 @@ class ControlWindow(ctk.CTkToplevel):
 
     def show_standings(self):
         standings_window = ctk.CTkToplevel(self)
-        standings_window.title("Tabell etter gruppespill")
+        standings_window.title(t("group_standings_title"))
         standings_window.geometry("700x800")
 
         for idx, team in enumerate(self.group_stage_model.standings(), start=1):
@@ -485,7 +496,12 @@ class ControlWindow(ctk.CTkToplevel):
                 logo_label.image = logo_img
                 logo_label.pack(side="left", padx=10)
 
-            stats = f"{idx}. {team.name} | Points: {team.points} | Hit: {team.cups_hit} | Diff: {team.total_cups_diff}"
+            stats = (
+                f"{idx}. {team.name} | "
+                f"{t('points_label')}: {team.points} | "
+                f"{t('hit_label')}: {team.cups_hit} | "
+                f"{t('diff_label')}: {team.total_cups_diff}"
+            )
             ctk.CTkLabel(frame, text=stats, font=("Helvetica", 16)).pack(side="left")
 
     def fill_team_list(self):
@@ -497,8 +513,8 @@ class ControlWindow(ctk.CTkToplevel):
             logo_path = None
             if self.logo_switch:
                 logo_path = fd.askopenfilename(
-                    title=f"Velg logo for {team.name}",
-                    filetypes=[("Image files", ".png .jpg .jpeg .gif")]
+                    title=t("choose_logo_for_team").format(team=team.name),
+                    filetypes=[(t("image_files"), ".png .jpg .jpeg .gif")]
                 )
 
             self.teams.append(Team(name=team.name, logo=logo_path))
@@ -522,7 +538,10 @@ class ControlWindow(ctk.CTkToplevel):
 
         rounds = self.tournament_model.get_rounds()
         for r, matches in enumerate(rounds):
-            round_label = ctk.CTkLabel(self.match_controls_frame, text=f"Runde {r+1} Kontroller")
+            round_label = ctk.CTkLabel(
+                self.match_controls_frame,
+                text=t("round_controls").format(round_number=r + 1)
+            )
             round_label.pack(pady=5)
 
             for mi, match in enumerate(matches):
@@ -532,7 +551,10 @@ class ControlWindow(ctk.CTkToplevel):
                 team1 = match.team1.name if match.team1 else "TBD"
                 team2 = match.team2.name if match.team2 else "TBD"
 
-                info_label = ctk.CTkLabel(frame, text=f"Kamp {mi+1}: {team1} vs {team2}")
+                info_label = ctk.CTkLabel(
+                    frame,
+                    text=t("match_label").format(match_number=mi + 1, team1=team1, team2=team2)
+                )
                 info_label.pack(side="left", padx=5)
 
                 if match.winner:
@@ -550,15 +572,15 @@ class ControlWindow(ctk.CTkToplevel):
                         command=lambda r=r, mi=mi, t=team2: self.set_winner(r, mi, t)
                     )
 
-                start_time = match.start_time if match.start_time else "Ikke satt"
+                start_time = match.start_time if match.start_time else t("not_set")
                 btn_time = ctk.CTkButton(
                     frame,
-                    text=f"Sett starttid ({start_time})",
+                    text=t("set_start_time_with_value").format(value=start_time),
                     command=lambda r=r, mi=mi: self.set_start_time(r, mi)
                 )
                 btn_time.pack(side="right", padx=5)
 
-                btn_edit = ctk.CTkButton(frame, text="Rediger", command=lambda r=r, mi=mi: self.edit_match(r, mi))
+                btn_edit = ctk.CTkButton(frame, text=t("edit"), command=lambda r=r, mi=mi: self.edit_match(r, mi))
                 btn_edit.pack(side="right", padx=5)
 
                 btn2.pack(side="right", padx=5)
@@ -579,9 +601,9 @@ class ControlWindow(ctk.CTkToplevel):
         self.bracket_canvas.refresh()
 
     def set_start_time(self, round_index, match_index):
-        top = self._make_dialog("Sett starttid", width=360, height=220)
+        top = self._make_dialog(t("set_start_time_title"), width=360, height=220)
 
-        ctk.CTkLabel(top, text="Skriv inn starttid (f.eks. HH:MM):").pack(pady=(20, 8))
+        ctk.CTkLabel(top, text=t("enter_start_time_example")).pack(pady=(20, 8))
 
         entry = ctk.CTkEntry(top, width=140)
         entry.pack(pady=6)
@@ -592,7 +614,7 @@ class ControlWindow(ctk.CTkToplevel):
         def save(event=None):
             new_time = normalize_time_input(entry.get())
             if not is_valid_hhmm(new_time):
-                err_lbl.configure(text="Ugyldig klokkeslett. Bruk HH:MM.")
+                err_lbl.configure(text=t("invalid_time_hhmm"))
                 return
 
             self.tournament_model.set_start_time(round_index, match_index, new_time)
@@ -603,8 +625,8 @@ class ControlWindow(ctk.CTkToplevel):
         btn_row = ctk.CTkFrame(top)
         btn_row.pack(pady=16)
 
-        ctk.CTkButton(btn_row, text="Avbryt", command=top.destroy).pack(side="left", padx=6)
-        ctk.CTkButton(btn_row, text="Lagre", command=save).pack(side="left", padx=6)
+        ctk.CTkButton(btn_row, text=t("cancel"), command=top.destroy).pack(side="left", padx=6)
+        ctk.CTkButton(btn_row, text=t("save"), command=save).pack(side="left", padx=6)
 
         entry.bind("<Return>", save)
         top.bind("<Escape>", lambda _e: top.destroy())
@@ -612,19 +634,19 @@ class ControlWindow(ctk.CTkToplevel):
         top.after(50, lambda: entry.focus_force())
 
     def edit_match(self, round_index, match_index):
-        edit_window = self._make_dialog("Rediger kamp")
+        edit_window = self._make_dialog(t("edit_match_title"))
 
         match = self.tournament_model.get_rounds()[round_index][match_index]
         team1_current = match.team1.name if match.team1 is not None else ""
         team2_current = match.team2.name if match.team2 is not None else ""
 
-        label1 = ctk.CTkLabel(edit_window, text="Lag 1:")
+        label1 = ctk.CTkLabel(edit_window, text=t("team_1"))
         label1.pack(pady=5)
         entry1 = ctk.CTkEntry(edit_window, width=200)
         entry1.insert(0, team1_current)
         entry1.pack(pady=5)
 
-        label2 = ctk.CTkLabel(edit_window, text="Lag 2:")
+        label2 = ctk.CTkLabel(edit_window, text=t("team_2"))
         label2.pack(pady=5)
         entry2 = ctk.CTkEntry(edit_window, width=200)
         entry2.insert(0, team2_current)
@@ -638,6 +660,6 @@ class ControlWindow(ctk.CTkToplevel):
             self.draw_match_controls()
             self.bracket_canvas.refresh()
 
-        save_button = ctk.CTkButton(edit_window, text="Lagre", command=save_edits)
+        save_button = ctk.CTkButton(edit_window, text=t("save"), command=save_edits)
         save_button.pack(pady=10)
         edit_window.after(50, lambda: entry1.focus_force())

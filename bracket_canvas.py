@@ -3,6 +3,8 @@ import tkinter as tk
 
 from PIL import Image, ImageTk
 
+from translations import t
+
 class TournamentBracketCanvas(ctk.CTkFrame):
     """
     Hovedvinduet som viser braketten på en Canvas i pyramideform.
@@ -31,7 +33,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         self.canvas.create_text(
             canvas_width / 2,
             canvas_height / 2 - 300,
-            text="🏆 Vinner av turnering! 🏆",
+            text=t("winner_of_tournament"),
             font=("Arial", 60),
             fill="white",
         )
@@ -55,7 +57,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
                 )
                 self.images.append(logo_img)
             except Exception as e:
-                print(f"Feil ved lasting av logo: {e}")
+                print(f"Error when loading logo: {e}")
 
     def show_group_stage(self, group_stage_model):
         self.canvas.delete("all")
@@ -68,8 +70,9 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         canvas_height = self.canvas.winfo_height()
 
         self.canvas.create_text(
-            canvas_width / 2, 30, text="Gruppespill", font=("Arial", 30), fill="white"
+            canvas_width / 2, 30, text=t("group_stage"), font=("Arial", 30), fill="white"
         )
+        
 
         start_y = 80
         box_pady = 5
@@ -82,7 +85,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         self.canvas.create_text(
             canvas_width / 4,
             start_y - 6 * box_pady,
-            text="Tabell",
+            text=t("standings"),
             font=("Arial", 24),
             fill="white",
         )
@@ -108,7 +111,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
             self.canvas.create_text(
                 results_x,
                 text_ypos,
-                text=f"P    |    T    |    D\n{team.points}    |    {team.cups_hit}    |    {team.total_cups_diff}",
+                text=f"{t('points_hit_diff_header')}\n{team.points}    |    {team.cups_hit}    |    {team.total_cups_diff}",
                 font=("Arial", fontsize),
                 fill="white",
                 justify="left",
@@ -122,7 +125,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
                     self.canvas.create_image(box_width / 8, text_ypos - box_pady / 2, image=logo_img)
                     self.images.append(logo_img)
                 except Exception as e:
-                    print(f"Feil ved lasting av logo: {e}")
+                    print(f"Error loading logo: {e}")
 
         matches_start_y = 80
         matches_start_x = box_width + 0.5 * box_width + 2 * box_padx - box2_width / 2
@@ -130,7 +133,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         self.canvas.create_text(
             3 * canvas_width / 4,
             matches_start_y - 6 * box_pady,
-            text="Kamper",
+            text=t("matches"),
             font=("Arial", 24),
             fill="white",
         )
@@ -146,8 +149,8 @@ class TournamentBracketCanvas(ctk.CTkFrame):
             teamname1_x = matches_start_x + box2_width / 4 + thumbnail_size
             teamname2_x = matches_start_x + 3 * box2_width / 4 - thumbnail_size
 
-            team1_name = match.team1.name if match.team1 else "TBD"
-            team2_name = match.team2.name if match.team2 else "TBD"
+            team1_name = match.team1.name if match.team1 else t("tbd")
+            team2_name = match.team2.name if match.team2 else t("tbd")
 
             if match.time:
                 if match.played:
@@ -162,7 +165,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
                     self.canvas.create_text(
                         matches_start_x + box2_width / 2,
                         text_ypos + box_height / 6,
-                        text="vs",
+                        text=t("vs"),
                         font=("Arial", fontsize),
                         fill="white",
                     )
@@ -186,7 +189,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
                     self.canvas.create_text(
                         matches_start_x + box2_width / 2,
                         text_ypos + box_height / 6,
-                        text="vs",
+                        text=t("vs"),
                         font=("Arial", fontsize),
                         fill="white",
                     )
@@ -202,7 +205,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
                 self.canvas.create_text(
                     matches_start_x + box2_width / 2,
                     time_ypos,
-                    text=f"Starter: {match.time}",
+                    text=t("starts_at").format(time=match.time),
                     font=("Arial", int(fontsize * 4 / 5)),
                     fill="white",
                 )
@@ -218,7 +221,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
                 self.canvas.create_text(
                     matches_start_x + box2_width / 2,
                     text_ypos,
-                    text="vs",
+                    text=t("vs"),
                     font=("Arial", fontsize),
                     fill="white",
                 )
@@ -243,7 +246,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
                     )
                     self.images.append(logo_img)
                 except Exception as e:
-                    print(f"Feil ved lasting av logo: {e}")
+                    print(f"Error loading logo: {e}")
 
             if match.team2 and match.team2.logo:
                 try:
@@ -257,7 +260,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
                     )
                     self.images.append(logo_img)
                 except Exception as e:
-                    print(f"Feil ved lasting av logo: {e}")
+                    print(f"Error loading logo: {e}")
 
     def draw_bracket(self):
         self.canvas.delete("all")
@@ -325,9 +328,9 @@ class TournamentBracketCanvas(ctk.CTkFrame):
 
                 self.canvas.create_rectangle(x0, y0, x1, y1, fill="gray20", outline="black")
 
-                team1_name = match.team1.name if match.team1 else "TBD"
-                team2_name = match.team2.name if match.team2 else "TBD"
-                text = f"{team1_name}\nvs\n{team2_name}"
+                team1_name = match.team1.name if match.team1 else t("tbd")
+                team2_name = match.team2.name if match.team2 else t("tbd")
+                text = f"{team1_name}\n{t('vs')}\n{team2_name}"
 
                 self.canvas.create_text(
                     x, y, text=text, font=("Helvetica", 16), fill="white", justify="center"
@@ -343,7 +346,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
                         self.canvas.create_image(x0 + logo_size / 2 + padding, y, image=img1_tk)
                         self.images.append(img1_tk)
                     except Exception as e:
-                        print(f"Feil ved lasting av logo for {team1_name}: {e}")
+                        print(f"Error loading logo {team1_name}: {e}")
 
                 if match.team2 and match.team2.logo:
                     try:
@@ -352,7 +355,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
                         self.canvas.create_image(x1 - logo_size / 2 - padding, y, image=img2_tk)
                         self.images.append(img2_tk)
                     except Exception as e:
-                        print(f"Feil ved lasting av logo for {team2_name}: {e}")
+                        print(f"Error loading logo {team2_name}: {e}")
 
                 if r > 0:
                     child_index = i * 2
@@ -376,7 +379,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
                                 self.canvas.create_text(
                                     text_x,
                                     text_y,
-                                    text=f"Starter: {child_match.start_time}",
+                                    text=t("starts_at").format(time=child_match.start_time),
                                     font=("Helvetica", 11),
                                     fill="white",
                                 )
