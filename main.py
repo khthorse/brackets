@@ -1,10 +1,8 @@
 import customtkinter as ctk
 from timer import Timer
 from paths import resource_path
-from PIL import Image, ImageTk
+from PIL import Image
 import time
-import sys
-import os
 
 from models import TournamentModel
 from bracket_canvas import TournamentBracketCanvas
@@ -74,7 +72,7 @@ settings.default_muted = True
 settings.alarm_enabled = False
 settings.pulse_enabled = False
 settings.blink_enabled = False
-settings.ask_for_logos = True
+settings.ask_for_logos = False
 settings.shuffle_teams = False
 settings.table_count = 3
 settings.timer_mode = "per_table"
@@ -122,6 +120,14 @@ bracket_frame = TournamentBracketCanvas(
     settings=settings,
 )
 
+image_path = resource_path("graphics/menageriet_logo.png")
+image_light = Image.open(image_path)
+main_logo = ctk.CTkImage(light_image=image_light, dark_image=image_light, size=(120, 120))
+
+main_logo_label = ctk.CTkLabel(master=main_frame, image=main_logo, text="")
+main_logo_label.image = main_logo
+main_logo_label.place(relx=1.0, rely=1.0, anchor="se", x=-20, y=-20)
+
 # Timer 1
 timer_label = ctk.CTkLabel(master=timer_frame, text=t("countdown_timer"), font=("Arial", 40))
 timer_label.pack(pady=12, padx=10)
@@ -139,15 +145,6 @@ control_window = ControlWindow(
 
 #fullscreen_button = ctk.CTkButton(master=timer_frame, text='Fullskjerm', command=fullscreen())
 #fullscreen_button.pack(pady=12, padx=10)
-
-# logo
-image_path = resource_path('graphics/menageriet_logo.png')
-image_light = Image.open(image_path)
-#image_dark = Image.open('menageriet_logo_dark.png')
-logo = ctk.CTkImage(light_image=image_light, dark_image=image_light, size=(200, 200))
-
-logo_label = ctk.CTkLabel(master=timer_frame, image=logo, text='')
-logo_label.pack(pady=12, padx=10, anchor='s')
 
 
 root.mainloop()

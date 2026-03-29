@@ -15,9 +15,11 @@ except ImportError:
     winsound = None
 
 class Timer:
-    def __init__(self, master, initial_time, timer_label, show_controls=True, settings=None):
+    def __init__(self, master, initial_time, timer_label, show_controls=True, settings=None, scale=1.0):
         self.master = master
         self.settings = settings
+        self.scale = scale
+        self.base_arc_width = max(6, int(15 * self.scale))
         self.initial_time = initial_time
         self.current_time = initial_time
         self.muted = settings.default_muted if settings is not None else False
@@ -33,14 +35,21 @@ class Timer:
         self._start_timestamp = None
         self._remaining_before_start = float(initial_time)
 
+        outer_pad_y = max(6, int(20 * self.scale))
+        outer_pad_x = max(6, int(20 * self.scale))
+
         self.frame = ctk.CTkFrame(master)
-        self.frame.pack(pady=20, padx=20)
+        self.frame.pack(pady=outer_pad_y, padx=outer_pad_x)
 
-        self._timer_label = ctk.CTkLabel(self.frame, text=timer_label, font=("Helvetica", 50))
-        self._timer_label.pack(pady=10, padx=5)
+        title_font_size = max(18, int(50 * self.scale))
+        title_pad_y = max(4, int(10 * self.scale))
+        title_pad_x = max(2, int(5 * self.scale))
 
-        self.canvas_size = 250
-        pad = 10
+        self._timer_label = ctk.CTkLabel(self.frame, text=timer_label, font=("Helvetica", title_font_size))
+        self._timer_label.pack(pady=title_pad_y, padx=title_pad_x)
+
+        self.canvas_size = max(120, int(250 * self.scale))
+        pad = max(4, int(10 * self.scale))
 
         bg_color = "#2b2b2b"
         self.canvas = ctk.CTkCanvas(
@@ -50,7 +59,8 @@ class Timer:
             bg=bg_color,
             highlightthickness=0,
         )
-        self.canvas.pack(pady=5)
+        canvas_pad_y = max(2, int(5 * self.scale))
+        self.canvas.pack(pady=canvas_pad_y)
 
         self.arc = self.canvas.create_arc(
             pad,
@@ -60,37 +70,72 @@ class Timer:
             start=90,
             extent=0,
             style="arc",
-            width=15,
+            width=self.base_arc_width,
             outline="#4682B4",
         )
  
+        time_font_size = max(18, int(40 * self.scale))
+
         self.canvas_text = self.canvas.create_text(
             self.canvas_size / 2,
             self.canvas_size / 2,
             text="",
-            font=("Helvetica", 40),
+            font=("Helvetica", time_font_size),
             fill="white",
         )
 
         if self.show_controls:
+            button_frame_pad_y = max(4, int(10 * self.scale))
+            button_frame_pad_x = max(4, int(10 * self.scale))
+
             self.buttonframe = ctk.CTkFrame(self.frame)
-            self.buttonframe.pack(pady=10, padx=10)
+            self.buttonframe.pack(pady=button_frame_pad_y, padx=button_frame_pad_x)
 
-            self.start_button = ctk.CTkButton(self.buttonframe, text=t("start"), command=self.countdown)
-            self.start_button.grid(row=0, column=0, padx=10, pady=5)
+            button_font_size = max(11, int(13 * self.scale))
+            button_width = max(70, int(140 * self.scale))
+            button_height = max(28, int(36 * self.scale))
+            button_pad_x = max(3, int(10 * self.scale))
+            button_pad_y = max(3, int(5 * self.scale))
 
-            self.pause_button = ctk.CTkButton(self.buttonframe, text=t("pause"), command=self.toggle_pause)
-            self.pause_button.grid(row=0, column=1, padx=10, pady=5)
+            self.start_button = ctk.CTkButton(
+                self.buttonframe,
+                text=t("start"),
+                command=self.countdown,
+                width=button_width,
+                height=button_height,
+                font=("Helvetica", button_font_size),
+            )
+            self.start_button.grid(row=0, column=0, padx=button_pad_x, pady=button_pad_y)
 
-            self.reset_button = ctk.CTkButton(self.buttonframe, text=t("reset"), command=self.reset_timer)
-            self.reset_button.grid(row=1, column=0, padx=10, pady=5)
+            self.pause_button = ctk.CTkButton(
+                self.buttonframe,
+                text=t("pause"),
+                command=self.toggle_pause,
+                width=button_width,
+                height=button_height,
+                font=("Helvetica", button_font_size),
+            )
+            self.pause_button.grid(row=0, column=1, padx=button_pad_x, pady=button_pad_y)
+
+            self.reset_button = ctk.CTkButton(
+                self.buttonframe,
+                text=t("reset"),
+                command=self.reset_timer,
+                width=button_width,
+                height=button_height,
+                font=("Helvetica", button_font_size),
+            )
+            self.reset_button.grid(row=1, column=0, padx=button_pad_x, pady=button_pad_y)
 
             self.change_time_button = ctk.CTkButton(
                 self.buttonframe,
                 text=t("change_time"),
                 command=self.open_change_time_popup,
+                width=button_width,
+                height=button_height,
+                font=("Helvetica", button_font_size),
             )
-            self.change_time_button.grid(row=1, column=1, padx=10, pady=5)
+            self.change_time_button.grid(row=1, column=1, padx=button_pad_x, pady=button_pad_y)
 
         self.update_label()
 
@@ -154,17 +199,18 @@ class Timer:
         color = self.get_time_color()
 
         pulse = self._pulse_factor() if (self.settings is None or self.settings.pulse_enabled) else 0.0
-        arc_width = 15 + pulse * 3
+        pulse_extra = max(1, int(3 * self.scale))
+        arc_width = self.base_arc_width + pulse * pulse_extra
 
         # Ikke tegn bue før den er stor nok til å se pen ut
         if self.initial_time > 30:
             if abs(ext) < 0.3:
-                self.canvas.itemconfig(self.arc, extent=0, outline="#2b2b2b", width=15)
+                self.canvas.itemconfig(self.arc, extent=0, outline="#2b2b2b", width=self.base_arc_width)
             else:
                 self.canvas.itemconfig(self.arc, extent=ext, outline=color, width=arc_width)
         else:
             if progress == 0:
-                self.canvas.itemconfig(self.arc, extent=0, outline="#2b2b2b", width=15)
+                self.canvas.itemconfig(self.arc, extent=0, outline="#2b2b2b", width=self.base_arc_width)
             elif abs(ext) < 8:
                 self.canvas.itemconfig(self.arc, extent=-8, outline=color, width=arc_width)
             else:
@@ -222,7 +268,7 @@ class Timer:
         color = self.get_time_color()
 
         self.canvas.itemconfig(self.canvas_text, text=t("finished"), fill=color)
-        self.canvas.itemconfig(self.arc, extent=-359.999, outline=color, width=15)
+        self.canvas.itemconfig(self.arc, extent=-359.999, outline=color, width=self.base_arc_width)
 
         self._play_alarm_async()
 
@@ -261,10 +307,10 @@ class Timer:
 
         if self._blink_on:
             self.canvas.itemconfig(self.canvas_text, text=t("finished"), fill=color)
-            self.canvas.itemconfig(self.arc, outline=color, width=15)
+            self.canvas.itemconfig(self.arc, outline=color, width=self.base_arc_width)
         else:
             self.canvas.itemconfig(self.canvas_text, text=t("finished"), fill="#2b2b2b")
-            self.canvas.itemconfig(self.arc, outline="#2b2b2b", width=15)
+            self.canvas.itemconfig(self.arc, outline="#2b2b2b", width=self.base_arc_width)
 
         self._blink_on = not self._blink_on
         self._notify_observers()
