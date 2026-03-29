@@ -70,36 +70,55 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         canvas_width = self.canvas.winfo_width()
         canvas_height = self.canvas.winfo_height()
 
-        self.canvas.create_text(
-            canvas_width / 2, 30, text=t("group_stage"), font=("Arial", 30), fill="white"
-        )
-        
+        if canvas_width < 10 or canvas_height < 10 or not standings:
+            return
 
-        start_y = 80
-        box_pady = 5
-        box_padx = 10
+        scale = canvas_height / 1080
+        scale = max(0.75, min(1.6, scale))
+
+        title_font = max(18, int(30 * scale))
+        section_font = max(14, int(24 * scale))
+
+        start_y = int(80 * scale)
+        box_pady = max(3, int(5 * scale))
+        box_padx = max(6, int(10 * scale))
+
         box_height = (canvas_height - start_y - 2 * box_pady) / len(standings)
         box_width = (canvas_width / 2) - 2 * box_padx
         box2_width = (canvas_width * 4 / 10) - 2 * box_padx
-        thumbnail_size = box_height - 4 * box_pady
+
+        thumbnail_size = max(18, int(box_height - 4 * box_pady))
+        fontsize = max(10, int(min(box_height / 4, 22 * scale)))
+        small_fontsize = max(8, int(fontsize * 3 / 4))
+        time_fontsize = max(8, int(fontsize * 4 / 5))
+
+        self.canvas.create_text(
+            canvas_width / 2,
+            int(30 * scale),
+            text=t("group_stage"),
+            font=("Arial", title_font),
+            fill="white",
+        )
 
         self.canvas.create_text(
             canvas_width / 4,
             start_y - 6 * box_pady,
             text=t("standings"),
-            font=("Arial", 24),
+            font=("Arial", section_font),
             fill="white",
         )
 
         for idx, team in enumerate(standings, start=1):
-            box_x0, box_y0 = box_padx, start_y + box_pady + (idx - 1) * box_height
-            box_x1, box_y1 = box_width - box_padx, box_y0 - box_pady + box_height
+            box_x0 = box_padx
+            box_y0 = start_y + box_pady + (idx - 1) * box_height
+            box_x1 = box_width - box_padx
+            box_y1 = box_y0 - box_pady + box_height
 
             self.canvas.create_rectangle(box_x0, box_y0, box_x1, box_y1, fill="#333333")
+
             text_ypos = box_y1 + box_pady - box_height / 2
             teamname_x = box_width / 4
             results_x = 3 * box_width / 4
-            fontsize = int(box_height / 4)
 
             self.canvas.create_text(
                 teamname_x,
@@ -109,6 +128,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
                 fill="white",
                 anchor="w",
             )
+
             self.canvas.create_text(
                 results_x,
                 text_ypos,
@@ -123,25 +143,31 @@ class TournamentBracketCanvas(ctk.CTkFrame):
                     img = Image.open(team.logo)
                     img.thumbnail((thumbnail_size, thumbnail_size), Image.LANCZOS)
                     logo_img = ImageTk.PhotoImage(img)
-                    self.canvas.create_image(box_width / 8, text_ypos - box_pady / 2, image=logo_img)
+                    self.canvas.create_image(
+                        box_width / 8,
+                        text_ypos - box_pady / 2,
+                        image=logo_img,
+                    )
                     self.images.append(logo_img)
                 except Exception as e:
                     print(f"Error loading logo: {e}")
 
-        matches_start_y = 80
+        matches_start_y = start_y
         matches_start_x = box_width + 0.5 * box_width + 2 * box_padx - box2_width / 2
 
         self.canvas.create_text(
             3 * canvas_width / 4,
             matches_start_y - 6 * box_pady,
             text=t("matches"),
-            font=("Arial", 24),
+            font=("Arial", section_font),
             fill="white",
         )
 
         for idx, match in enumerate(matches, start=1):
-            box_x0, box_y0 = matches_start_x + box_padx, start_y + box_pady + (idx - 1) * box_height
-            box_x1, box_y1 = matches_start_x + box2_width - box_padx, box_y0 - box_pady + box_height
+            box_x0 = matches_start_x + box_padx
+            box_y0 = start_y + box_pady + (idx - 1) * box_height
+            box_x1 = matches_start_x + box2_width - box_padx
+            box_y1 = box_y0 - box_pady + box_height
 
             self.canvas.create_rectangle(box_x0, box_y0, box_x1, box_y1, fill="#333333")
 
@@ -149,65 +175,68 @@ class TournamentBracketCanvas(ctk.CTkFrame):
             text_ypos = box_y1 + box_pady - box_height / 2
             teamname1_x = matches_start_x + box2_width / 4 + thumbnail_size
             teamname2_x = matches_start_x + 3 * box2_width / 4 - thumbnail_size
+            center_x = matches_start_x + box2_width / 2
 
             team1_name = match.team1.name if match.team1 else t("tbd")
             team2_name = match.team2.name if match.team2 else t("tbd")
 
             if match.time:
+                y_match = text_ypos + box_height / 6
+
                 if match.played:
                     self.canvas.create_text(
                         teamname1_x,
-                        text_ypos + box_height / 6,
+                        y_match,
                         text=team1_name,
-                        font=("Arial overstrike", int(fontsize * 3 / 4)),
+                        font=("Arial", small_fontsize, "overstrike"),
                         fill="white",
                         justify="left",
                     )
                     self.canvas.create_text(
-                        matches_start_x + box2_width / 2,
-                        text_ypos + box_height / 6,
+                        center_x,
+                        y_match,
                         text=t("vs"),
                         font=("Arial", fontsize),
                         fill="white",
                     )
                     self.canvas.create_text(
                         teamname2_x,
-                        text_ypos + box_height / 6,
+                        y_match,
                         text=team2_name,
-                        font=("Arial", int(fontsize * 3 / 4)),
+                        font=("Arial", small_fontsize),
                         fill="white",
                         justify="right",
                     )
                 else:
                     self.canvas.create_text(
                         teamname1_x,
-                        text_ypos + box_height / 6,
+                        y_match,
                         text=team1_name,
-                        font=("Arial", int(fontsize * 3 / 4)),
+                        font=("Arial", small_fontsize),
                         fill="white",
                         justify="left",
                     )
                     self.canvas.create_text(
-                        matches_start_x + box2_width / 2,
-                        text_ypos + box_height / 6,
+                        center_x,
+                        y_match,
                         text=t("vs"),
                         font=("Arial", fontsize),
                         fill="white",
                     )
                     self.canvas.create_text(
                         teamname2_x,
-                        text_ypos + box_height / 6,
+                        y_match,
                         text=team2_name,
-                        font=("Arial", int(fontsize * 3 / 4)),
+                        font=("Arial", small_fontsize),
                         fill="white",
                         justify="right",
                     )
 
                 self.canvas.create_text(
-                    matches_start_x + box2_width / 2,
+                    center_x,
                     time_ypos,
                     text=t("starts_at").format(time=match.time),
-                    font=("Arial", int(fontsize * 4 / 5)),
+                    font=("Arial", time_fontsize),
                     fill="white",
                 )
             else:
@@ -215,12 +244,12 @@ class TournamentBracketCanvas(ctk.CTkFrame):
                     teamname1_x,
                     text_ypos,
                     text=team1_name,
-                    font=("Arial", int(fontsize * 3 / 4)),
+                    font=("Arial", small_fontsize),
                     fill="white",
                     justify="left",
                 )
                 self.canvas.create_text(
-                    matches_start_x + box2_width / 2,
+                    center_x,
                     text_ypos,
                     text=t("vs"),
                     font=("Arial", fontsize),
@@ -230,7 +259,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
                     teamname2_x,
                     text_ypos,
                     text=team2_name,
-                    font=("Arial", int(fontsize * 3 / 4)),
+                    font=("Arial", small_fontsize),
                     fill="white",
                     justify="right",
                 )
@@ -275,13 +304,27 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         canvas_width = self.canvas.winfo_width()
         canvas_height = self.canvas.winfo_height()
 
-        left_margin = 50
-        right_margin = 50
-        top_margin = 50
-        bottom_margin = 50
+        if canvas_width < 10 or canvas_height < 10:
+            return
 
-        box_width = 300
-        box_height = 80
+        # Skaler etter faktisk canvas-høyde
+        scale = canvas_height / 1080
+        scale = max(0.75, min(1.6, scale))
+
+        left_margin = int(50 * scale)
+        right_margin = int(50 * scale)
+        top_margin = int(50 * scale)
+        bottom_margin = int(50 * scale)
+
+        box_width = int(300 * scale)
+        box_height = int(80 * scale)
+
+        match_font_size = max(10, int(16 * scale))
+        logo_size = max(20, int(40 * scale))
+        padding = max(2, int(5 * scale))
+        line_width = max(1, int(1.4 * scale))
+        time_font_size = max(8, int(11 * scale))
+        time_offset_y = max(8, int(14 * scale))
 
         horizontal_spacing = (
             (canvas_width - left_margin - right_margin - num_rounds * box_width) / (num_rounds - 1)
@@ -334,11 +377,13 @@ class TournamentBracketCanvas(ctk.CTkFrame):
                 text = f"{team1_name}\n{t('vs')}\n{team2_name}"
 
                 self.canvas.create_text(
-                    x, y, text=text, font=("Helvetica", 16), fill="white", justify="center"
+                    x,
+                    y,
+                    text=text,
+                    font=("Helvetica", match_font_size),
+                    fill="white",
+                    justify="center",
                 )
-
-                logo_size = 40
-                padding = 5
 
                 if match.team1 and match.team1.logo:
                     try:
@@ -369,19 +414,28 @@ class TournamentBracketCanvas(ctk.CTkFrame):
                             child_x_right = child_x + box_width / 2
                             mid_x = (child_x_right + parent_x_left) / 2
 
-                            self.canvas.create_line(child_x_right, child_y, mid_x, child_y, fill="white")
-                            self.canvas.create_line(mid_x, child_y, mid_x, y, fill="white")
-                            self.canvas.create_line(mid_x, y, parent_x_left, y, fill="white")
+                            self.canvas.create_line(
+                                child_x_right, child_y, mid_x, child_y,
+                                fill="white", width=line_width
+                            )
+                            self.canvas.create_line(
+                                mid_x, child_y, mid_x, y,
+                                fill="white", width=line_width
+                            )
+                            self.canvas.create_line(
+                                mid_x, y, parent_x_left, y,
+                                fill="white", width=line_width
+                            )
 
                             child_match = rounds[r - 1][child_idx]
                             if child_match.start_time:
                                 text_x = (child_x_right + mid_x) / 2
-                                text_y = child_y - 14
+                                text_y = child_y - time_offset_y
                                 self.canvas.create_text(
                                     text_x,
                                     text_y,
                                     text=t("starts_at").format(time=child_match.start_time),
-                                    font=("Helvetica", 11),
+                                    font=("Helvetica", time_font_size),
                                     fill="white",
                                 )
 
