@@ -139,6 +139,39 @@ class Timer:
 
         self.update_label()
 
+    def set_scale(self, new_scale: float):
+        self.scale = new_scale
+        self.base_arc_width = max(6, int(15 * self.scale))
+
+        # oppdater canvas størrelse
+        self.canvas_size = max(120, int(250 * self.scale))
+        self.canvas.configure(width=self.canvas_size, height=self.canvas_size)
+
+        pad = max(4, int(10 * self.scale))
+
+        self.canvas.coords(
+            self.arc,
+            pad,
+            pad,
+            self.canvas_size - pad,
+            self.canvas_size - pad,
+        )
+
+        self.canvas.coords(
+            self.canvas_text,
+            self.canvas_size / 2,
+            self.canvas_size / 2,
+        )
+
+        # oppdater fonter
+        title_font_size = max(18, int(50 * self.scale))
+        time_font_size = max(18, int(40 * self.scale))
+
+        self._timer_label.configure(font=("Helvetica", title_font_size))
+        self.canvas.itemconfig(self.canvas_text, font=("Helvetica", time_font_size))
+
+        self.update_label()
+
     def add_observer(self, callback):
         self._observers.append(callback)
 

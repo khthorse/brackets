@@ -24,6 +24,9 @@ class AppSettings:
     timer_mode: str = "per_table"   # "single", "per_table", "custom"
     timer_count: int = 2
 
+    fullscreen_enabled: bool = False
+    fullscreen_monitor_index: int = 0
+
     def get_timer_count(self) -> int:
         if self.timer_mode == "single":
             return 1
