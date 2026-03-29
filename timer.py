@@ -7,6 +7,7 @@ from tkinter import TclError
 
 from paths import resource_path
 from time_utils import normalize_time_input, is_valid_mmss, mmss_to_seconds
+from translations import t
 
 try:
     import winsound
@@ -74,18 +75,18 @@ class Timer:
             self.buttonframe = ctk.CTkFrame(self.frame)
             self.buttonframe.pack(pady=10, padx=10)
 
-            self.start_button = ctk.CTkButton(self.buttonframe, text="Start", command=self.countdown)
+            self.start_button = ctk.CTkButton(self.buttonframe, text=t("start"), command=self.countdown)
             self.start_button.grid(row=0, column=0, padx=10, pady=5)
 
-            self.pause_button = ctk.CTkButton(self.buttonframe, text="Pause", command=self.toggle_pause)
+            self.pause_button = ctk.CTkButton(self.buttonframe, text=t("pause"), command=self.toggle_pause)
             self.pause_button.grid(row=0, column=1, padx=10, pady=5)
 
-            self.reset_button = ctk.CTkButton(self.buttonframe, text="Reset", command=self.reset_timer)
+            self.reset_button = ctk.CTkButton(self.buttonframe, text=t("reset"), command=self.reset_timer)
             self.reset_button.grid(row=1, column=0, padx=10, pady=5)
 
             self.change_time_button = ctk.CTkButton(
                 self.buttonframe,
-                text="Change Time",
+                text=t("change_time"),
                 command=self.open_change_time_popup,
             )
             self.change_time_button.grid(row=1, column=1, padx=10, pady=5)
@@ -112,7 +113,7 @@ class Timer:
         self._notify_observers()
 
     def get_mute_text(self):
-        return "🔇 Muted" if self.muted else "🔊 Lyd på"
+        return t("mute_on") if self.muted else t("mute_off")
 
     def _play_alarm(self):
         if self.muted:
@@ -125,7 +126,7 @@ class Timer:
             sound_path = resource_path("sounds/bottle_alarm.wav")
             winsound.PlaySound(sound_path, winsound.SND_FILENAME)
         except Exception as e:
-            print("Kunne ikke spille lyd:", e)
+            print("Could not play sound:", e)
 
 
     def _play_alarm_async(self):
@@ -216,7 +217,7 @@ class Timer:
 
         color = self.get_time_color()
 
-        self.canvas.itemconfig(self.canvas_text, text="Ferdig!", fill=color)
+        self.canvas.itemconfig(self.canvas_text, text=t("finished"), fill=color)
         self.canvas.itemconfig(self.arc, extent=-359.999, outline=color, width=15)
 
         self._play_alarm_async()
@@ -232,11 +233,11 @@ class Timer:
                 self.master.after_cancel(self.timer_id)
                 self.timer_id = None
             if hasattr(self, "pause_button"):
-                self.pause_button.configure(text="Resume")
+                self.pause_button.configure(text=t("resume"))
         else:
             self.paused = False
             if hasattr(self, "pause_button"):
-                self.pause_button.configure(text="Pause")
+                self.pause_button.configure(text=t("pause"))
             self.countdown()
 
         self._notify_observers()
@@ -253,10 +254,10 @@ class Timer:
         color = self.get_time_color()
 
         if self._blink_on:
-            self.canvas.itemconfig(self.canvas_text, text="Ferdig!", fill=color)
+            self.canvas.itemconfig(self.canvas_text, text=t("finished"), fill=color)
             self.canvas.itemconfig(self.arc, outline=color, width=15)
         else:
-            self.canvas.itemconfig(self.canvas_text, text="Ferdig!", fill="#2b2b2b")
+            self.canvas.itemconfig(self.canvas_text, text=t("finished"), fill="#2b2b2b")
             self.canvas.itemconfig(self.arc, outline="#2b2b2b", width=15)
 
         self._blink_on = not self._blink_on
@@ -275,7 +276,10 @@ class Timer:
         self._blink_on = True
 
     def open_change_time_popup(self):
-        popup = ctk.CTkInputDialog(title="Change Time", text="enter new time:  mm:ss")
+        popup = ctk.CTkInputDialog(
+            title=t("change_time_title"),
+            text=t("enter_new_time_mmss")
+        )
         new_time = popup.get_input()
 
         if new_time is None:
@@ -306,7 +310,7 @@ class Timer:
         self.paused = False
 
         if hasattr(self, "pause_button"):
-            self.pause_button.configure(text="Pause")
+            self.pause_button.configure(text=t("pause"))
 
         self.canvas.itemconfig(self.canvas_text, fill="white")
         self.update_label()
@@ -314,7 +318,7 @@ class Timer:
     def set_time_from_input(self, value: str):
         normalized = normalize_time_input(value)
         if not is_valid_mmss(normalized):
-            raise ValueError("Ugyldig tid. Bruk MM:SS.")
+            raise ValueError(t("invalid_mmss_time"))
         self.set_time_seconds(mmss_to_seconds(normalized))
 
     def get_display_time(self) -> str:
@@ -325,21 +329,21 @@ class Timer:
 
     def get_status_text(self) -> str:
         if self.current_time < 0:
-            return "Ferdig"
+            return t("finished")
         if self.paused:
-            return "Pause"
+            return t("pause")
         if self.timer_id is not None:
-            return "Kjører"
-        return "Klar"
+            return t("running")
+        return t("ready")
 
     def get_primary_button_text(self) -> str:
         if self.current_time < 0:
-            return "Start"
+            return t("start")
         if self.paused:
-            return "Resume"
+            return t("resume")
         if self.timer_id is not None:
-            return "Pause"
-        return "Start"
+            return t("pause")
+        return t("start")
 
     def primary_action(self):
         if self.current_time < 0:
@@ -416,6 +420,6 @@ class Timer:
 if __name__ == "__main__":
     ctk.set_appearance_mode("dark")
     root = ctk.CTk()
-    root.title("Timer")
-    timer = Timer(master=root, initial_time=20, timer_label="Timer")
+    root.title(t("countdown_timer"))
+    timer = Timer(master=root, initial_time=20, timer_label=t("countdown_timer"))
     root.mainloop()
