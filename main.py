@@ -1,22 +1,14 @@
 import customtkinter as ctk
 from timer import Timer
+from paths import resource_path
 from PIL import Image, ImageTk
 import time
 import sys
 import os
-from brackets import TournamentModel, TournamentBracketCanvas, ControlWindow
 
-
-
-def resource_path(relative_path):
-    """Finner riktig filbane både under utvikling og når programmet er pakket."""
-    try:
-        # PyInstaller lagrer midlertidige filer i en temp-mappe
-        base_path = sys._MEIPASS
-    except AttributeError:
-        base_path = os.path.abspath(".")
-
-    return os.path.join(base_path, relative_path)
+from models import TournamentModel
+from bracket_canvas import TournamentBracketCanvas
+from control_window import ControlWindow
 
 
 def find_time():
