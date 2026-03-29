@@ -1,8 +1,11 @@
 import time
 import threading
-import os
+
 import customtkinter as ctk
 
+from tkinter import TclError
+
+from paths import resource_path
 from time_utils import normalize_time_input, is_valid_mmss, mmss_to_seconds
 
 try:
@@ -15,6 +18,7 @@ class Timer:
         self.master = master
         self.initial_time = initial_time
         self.current_time = initial_time
+        self.muted = False
         self.paused = False
         self.timer_id = None
         self.show_controls = show_controls
@@ -103,13 +107,22 @@ class Timer:
 
         self._observers = alive_callbacks
 
+    def toggle_mute(self):
+        self.muted = not self.muted
+        self._notify_observers()
+
+    def get_mute_text(self):
+        return "🔇 Muted" if self.muted else "🔊 Lyd på"
+
     def _play_alarm(self):
+        if self.muted:
+            return
+        
         if winsound is None:
             return
 
         try:
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            sound_path = os.path.join(base_dir, "sounds", "bottle_alarm.wav")
+            sound_path = resource_path("sounds/bottle_alarm.wav")
             winsound.PlaySound(sound_path, winsound.SND_FILENAME)
         except Exception as e:
             print("Kunne ikke spille lyd:", e)

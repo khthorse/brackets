@@ -105,7 +105,14 @@ class ControlWindow(ctk.CTkToplevel):
                 command=lambda t=timer: self.change_timer_time(t)
             ).pack(side="right", padx=4)
 
-            def update_timer_info(t=timer, tl=time_label, sl=status_label, pb=primary_button):
+            mute_button = ctk.CTkButton(
+                row,
+                text=timer.get_mute_text(),
+                command=lambda t=timer: t.toggle_mute()
+            )
+            mute_button.pack(side="right", padx=4)
+
+            def update_timer_info(t=timer, tl=time_label, sl=status_label, pb=primary_button, mb=mute_button):
                 if not (tl.winfo_exists() and sl.winfo_exists() and pb.winfo_exists()):
                     return
 
@@ -115,6 +122,7 @@ class ControlWindow(ctk.CTkToplevel):
                 )
                 sl.configure(text=t.get_status_text())
                 pb.configure(text=t.get_primary_button_text())
+                mb.configure(text=t.get_mute_text())
             timer.add_observer(update_timer_info)
             update_timer_info()
 
