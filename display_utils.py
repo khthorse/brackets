@@ -131,12 +131,26 @@ def get_secondary_monitor(primary_index: int) -> MonitorInfo:
     return monitors[0]
 
 
-def apply_windowed_on_monitor(window, monitor: MonitorInfo):
+def apply_windowed_on_monitor(
+    window,
+    monitor: MonitorInfo,
+    desired_width: int | None = None,
+    desired_height: int | None = None,
+):
     window.overrideredirect(False)
     window.attributes("-fullscreen", False)
-    window.geometry(
-        f"{monitor.width}x{monitor.height}+{monitor.left}+{monitor.top}"
+
+    if desired_width is None:
+        desired_width = monitor.work_width
+    if desired_height is None:
+        desired_height = monitor.work_height
+
+    width, height, x, y = get_centered_window_geometry(
+        monitor,
+        desired_width=desired_width,
+        desired_height=desired_height,
     )
+    window.geometry(f"{width}x{height}+{x}+{y}")
 
 
 def apply_borderless_fullscreen(window, monitor: MonitorInfo):
@@ -147,3 +161,81 @@ def apply_borderless_fullscreen(window, monitor: MonitorInfo):
     )
     window.lift()
     window.focus_force()
+
+def get_control_window_geometry(
+    monitor: MonitorInfo,
+    desired_width: int = 900,
+    width_fraction: float = 0.6,
+    frame_margin_x: int = 0,
+    frame_margin_y: int = 40,
+    min_width: int = 700,
+    min_height: int = 500,
+) -> tuple[int, int, int, int]:
+    width = min(desired_width, int(monitor.work_width * width_fraction))
+    width = max(min_width, width)
+
+    height = max(min_height, monitor.work_height - frame_margin_y)
+
+    x = monitor.work_left + (monitor.work_width - width) // 2
+    y = monitor.work_top + frame_margin_y // 2
+
+    return width, height, x, y
+
+def get_centered_window_geometry(
+    monitor: MonitorInfo,
+    desired_width: int,
+    desired_height: int,
+    min_width: int = 400,
+    min_height: int = 300,
+    frame_margin_y: int = 32,
+    top_offset: int = 0,
+) -> tuple[int, int, int, int]:
+    max_width = max(min_width, monitor.work_width)
+    max_height = max(min_height, monitor.work_height - frame_margin_y)
+
+    width = min(desired_width, max_width)
+    height = min(desired_height, max_height)
+
+    width = max(min_width, width)
+    height = max(min_height, height)
+
+    x = monitor.work_left + (monitor.work_width - width) // 2
+    y = monitor.work_top + top_offset
+
+    return width, height, x, y
+
+def apply_main_windowed_on_monitor(
+    window,
+    monitor: MonitorInfo,
+    frame_margin_x: int = 5,
+    frame_margin_y: int = 32,
+    x_offset: int = -5,
+):
+    width = monitor.work_width - frame_margin_x
+    height = monitor.work_height - frame_margin_y
+
+    x = monitor.work_left + x_offset
+    y = monitor.work_top
+
+    window.overrideredirect(False)
+    window.attributes("-fullscreen", False)
+    window.geometry(f"{width}x{height}+{x}+{y}")
+
+def apply_control_window_on_monitor(
+    window,
+    monitor: MonitorInfo,
+    desired_width: int = 900,
+    min_width: int = 700,
+    min_height: int = 500,
+    frame_margin_y: int = 32,
+):
+    width, height, x, y = get_centered_window_geometry(
+        monitor,
+        desired_width=desired_width,
+        desired_height=monitor.work_height,
+        min_width=min_width,
+        min_height=min_height,
+        frame_margin_y=frame_margin_y,
+        top_offset=0,
+    )
+    window.geometry(f"{width}x{height}+{x}+{y}")

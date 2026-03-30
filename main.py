@@ -9,14 +9,15 @@ from bracket_canvas import TournamentBracketCanvas
 from control_window import ControlWindow
 from translations import t, set_language
 from settings import AppSettings
+from tournament_state import TournamentState
 from display_utils import (
     get_monitor_by_index,
     get_secondary_monitor,
+    get_centered_window_geometry,
     apply_borderless_fullscreen,
-    apply_windowed_on_monitor,
+    apply_main_windowed_on_monitor,
+    apply_control_window_on_monitor,
 )
-from tournament_state import TournamentState
-
 
 def on_resize(event):
     if event.widget != root:
@@ -117,6 +118,7 @@ ctk.set_appearance_mode('dark')
 #ctk.set_default_color_theme('green')
 
 settings = AppSettings()
+
 set_language(settings.language)
 
 app_state = TournamentState(settings=settings)
@@ -131,13 +133,11 @@ root.title(app_state.title)
 if settings.fullscreen_enabled:
     apply_borderless_fullscreen(root, monitor)
 else:
-    apply_windowed_on_monitor(root, monitor)
-
-#root.state('zoomed')
+    apply_main_windowed_on_monitor(root, monitor)
 
 #configure grid
-root.columnconfigure(0, weight=5)
-root.columnconfigure(1, weight=95)
+root.columnconfigure(0, weight=0)
+root.columnconfigure(1, weight=1)
 root.rowconfigure(0, weight=1)
 
 # left frame timer
@@ -152,15 +152,15 @@ main_frame.grid(row=0, column=1, sticky='nsew', padx=10, pady=10)
 
 # brackets
 
-title_font_size = get_title_font_size(monitor.height)
+title_font_size = get_title_font_size(monitor.work_height)
 
 brackets_label = ctk.CTkLabel(
     master=main_frame,
     text=app_state.title,
     font=("Helvetica", title_font_size)
 )
-pad_y = int(12 * (monitor.height / 1080))
-pad_x = int(10 * (monitor.height / 1080))
+pad_y = int(12 * (monitor.work_height / 1080))
+pad_x = int(10 * (monitor.work_height / 1080))
 
 brackets_label.pack(pady=pad_y, padx=pad_x)
 
@@ -175,16 +175,16 @@ bracket_frame = TournamentBracketCanvas(
 
 image_path = resource_path("graphics/menageriet_logo.png")
 image_light = Image.open(image_path)
-logo_size = max(80, min(180, int(120 * (monitor.height / 1080))))
+logo_size = max(80, min(180, int(120 * (monitor.work_height / 1080))))
 main_logo = ctk.CTkImage(light_image=image_light, dark_image=image_light, size=(logo_size, logo_size))
 
 main_logo_label = ctk.CTkLabel(master=main_frame, image=main_logo, text="")
 main_logo_label.image = main_logo
-logo_margin = max(12, int(20 * (monitor.height / 1080)))
+logo_margin = max(12, int(20 * (monitor.work_height / 1080)))
 main_logo_label.place(relx=1.0, rely=1.0, anchor="se", x=-logo_margin, y=-logo_margin)
 
 # Timers
-timer_title_font_size = get_title_font_size(monitor.height)
+timer_title_font_size = get_title_font_size(monitor.work_height)
 
 timer_label = ctk.CTkLabel(
     master=timer_frame,
@@ -193,9 +193,11 @@ timer_label = ctk.CTkLabel(
 )
 timer_label.pack(pady=pad_y, padx=pad_x)
 
-timers = build_timers(timer_frame, settings, monitor.height)
+timers = build_timers(timer_frame, settings, monitor.work_height)
 
 root.bind("<Configure>", on_resize)
+root.update_idletasks()
+on_resize(type("Event", (), {"widget": root})())
 
 control_window = ControlWindow(
     master=main_frame,
@@ -208,9 +210,6 @@ control_window = ControlWindow(
 control_monitor = get_secondary_monitor(settings.fullscreen_monitor_index)
 
 control_window.update_idletasks()
-control_window.geometry(
-    f"{control_monitor.work_width}x{control_monitor.work_height}+{control_monitor.work_left}+{control_monitor.work_top}"
-)
-
+apply_control_window_on_monitor(control_window, control_monitor)
 
 root.mainloop()
