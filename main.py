@@ -10,27 +10,18 @@ from control_window import ControlWindow
 from translations import t, set_language
 from settings import AppSettings
 from display_utils import get_monitor_by_index, apply_borderless_fullscreen, apply_windowed_on_monitor
+from tournament_state import TournamentState
 
-
-def rebuild_timers(timer_frame, settings, monitor, timers_ref):
-    # Fjern gamle
-    for t in timers_ref:
-        t.frame.destroy()
-
-    timers_ref.clear()
-
-    new_timers = build_timers(timer_frame, settings, monitor.height)
-    timers_ref.extend(new_timers)
-
-    return new_timers
 
 def on_resize(event):
     if event.widget != root:
         return
 
-
     width = root.winfo_width()
     height = root.winfo_height()
+
+    if width < 100 or height < 100:
+        return
 
     resolution_scale = min(height / 1080, width / 1920)
     resolution_scale = max(0.9, min(1.5, resolution_scale))
@@ -49,7 +40,8 @@ def on_resize(event):
     new_scale = resolution_scale * count_scale
 
     for t in timers:
-        t.set_scale(new_scale)
+        if t.frame.winfo_exists():
+            t.set_scale(new_scale)
 
 def get_title_font_size(screen_height: int) -> int:
     base = 40  # størrelse for 1080p
@@ -120,27 +112,16 @@ ctk.set_appearance_mode('dark')
 #ctk.set_default_color_theme('green')
 
 settings = AppSettings()
-
-settings.default_muted = True
-settings.alarm_enabled = False
-settings.pulse_enabled = False
-settings.blink_enabled = False
-settings.ask_for_logos = False
-settings.shuffle_teams = False
-settings.table_count = 3
-settings.timer_mode = "per_table"
-settings.language = "en"
-settings.fullscreen_enabled = False
-settings.fullscreen_monitor_index = 0
-
 set_language(settings.language)
 
+app_state = TournamentState(settings=settings)
+app_state.title = get_tournament_title(settings)
 
 # root window
 monitor = get_monitor_by_index(settings.fullscreen_monitor_index)
 
 root = ctk.CTk()
-root.title(get_tournament_title(settings))
+root.title(app_state.title)
 
 if settings.fullscreen_enabled:
     apply_borderless_fullscreen(root, monitor)
@@ -153,8 +134,6 @@ else:
 root.columnconfigure(0, weight=5)
 root.columnconfigure(1, weight=95)
 root.rowconfigure(0, weight=1)
-
-root.bind("<Configure>", on_resize)
 
 # left frame timer
 timer_frame = ctk.CTkFrame(master=root)
@@ -172,7 +151,7 @@ title_font_size = get_title_font_size(monitor.height)
 
 brackets_label = ctk.CTkLabel(
     master=main_frame,
-    text=get_tournament_title(settings),
+    text=app_state.title,
     font=("Helvetica", title_font_size)
 )
 pad_y = int(12 * (monitor.height / 1080))
@@ -180,7 +159,8 @@ pad_x = int(10 * (monitor.height / 1080))
 
 brackets_label.pack(pady=pad_y, padx=pad_x)
 
-tournament_model = TournamentModel(settings=settings)
+app_state.bracket_model = TournamentModel(settings=settings)
+tournament_model = app_state.bracket_model
 
 bracket_frame = TournamentBracketCanvas(
     master=main_frame,
@@ -208,12 +188,13 @@ timer_label = ctk.CTkLabel(
 )
 timer_label.pack(pady=pad_y, padx=pad_x)
 
-timers = []
-timers.extend(build_timers(timer_frame, settings, monitor.height))
+timers = build_timers(timer_frame, settings, monitor.height)
+
+root.bind("<Configure>", on_resize)
 
 control_window = ControlWindow(
     master=main_frame,
-    tournament_model=tournament_model,
+    tournament_state=app_state,
     bracket_canvas=bracket_frame,
     timers=timers,
     settings=settings,

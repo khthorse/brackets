@@ -14,9 +14,10 @@ class ControlWindow(ctk.CTkToplevel):
     Kontrollvinduet der du kan legge inn lag, sette vinnere, angi starttidspunkt
     og redigere kampoppsettet.
     """
-    def __init__(self, master, tournament_model, bracket_canvas, timers=None, settings=None, *args, **kwargs):
+    def __init__(self, master, tournament_state, bracket_canvas, timers=None, settings=None, *args, **kwargs):
         super().__init__(master, *args, **kwargs)
-        self.tournament_model = tournament_model
+        self.tournament_state = tournament_state
+        self.tournament_model = tournament_state.bracket_model
         self.bracket_canvas = bracket_canvas
         self.settings = settings
 
@@ -42,8 +43,17 @@ class ControlWindow(ctk.CTkToplevel):
         load_from_file_btn.pack(pady=5)
 
         self.logo_switch = settings.ask_for_logos if settings is not None else False
-        load_logo_checkbox = ctk.CTkCheckBox(self, text=t("add_team_logos"), command=self.toggle_load_logo)
-        load_logo_checkbox.pack(pady=5)
+        self.load_logo_checkbox = ctk.CTkCheckBox(
+            self,
+            text=t("add_team_logos"),
+            command=self.toggle_load_logo
+        )
+        self.load_logo_checkbox.pack(pady=5)
+
+        if self.logo_switch:
+            self.load_logo_checkbox.select()
+        else:
+            self.load_logo_checkbox.deselect()
 
         self.start_group_button = ctk.CTkButton(self, text=t("start_group_stage"), command=self.start_group_stage)
         self.start_bracket_button = ctk.CTkButton(self, text=t("start_playoffs"), command=self.build_final_bracket)
@@ -70,7 +80,7 @@ class ControlWindow(ctk.CTkToplevel):
             row = ctk.CTkFrame(timer_section)
             row.pack(fill="x", padx=6, pady=4)
 
-            ctk.CTkLabel(row, text=t("table_label")).pack(side="left", padx=8)
+            ctk.CTkLabel(row, text=t("table_label").format(index=i)).pack(side="left", padx=8)
 
             time_frame = ctk.CTkFrame(
                     row,
@@ -230,8 +240,12 @@ class ControlWindow(ctk.CTkToplevel):
         self.draw_match_controls()
         self.start_bracket_button.pack_forget()
 
+        self.tournament_state.bracket_model = self.tournament_model
+        self.tournament_state.phase = "bracket"
+        self.tournament_state.mark_dirty()
+
     def toggle_load_logo(self):
-        self.logo_switch = not self.logo_switch
+        self.logo_switch = bool(self.load_logo_checkbox.get())
 
     def check_allowed_cup_number(self, cups):
         if cups > 10 or cups < 0:
@@ -295,7 +309,7 @@ class ControlWindow(ctk.CTkToplevel):
     def load_teams_from_file(self):
         path = fd.askopenfilename(
             title=t("choose_team_file"),
-            filetypes=[("CSV/Tekst", "*.csv *.txt *.tsv"), ("Alle filer", "*.*")]
+            filetypes=[(t("csv_text_files"), "*.csv *.txt *.tsv"), (t("all_files"), "*.*")]
         )
         if not path:
             return
@@ -303,7 +317,7 @@ class ControlWindow(ctk.CTkToplevel):
         try:
             self.teams = parse_team_file(path)
             if not self.teams:
-                raise ValueError(t("no_teams_in_file"))
+                raise ValueError(t("no_teams_found_in_file"))
 
             self.team_text.delete("1.0", "end")
             self.team_text.insert("1.0", "\n".join(t.name for t in self.teams))
@@ -336,6 +350,10 @@ class ControlWindow(ctk.CTkToplevel):
 
         self.start_group_button.pack_forget()
         self.start_bracket_button.pack(pady=5)
+
+        self.tournament_state.group_stage_model = self.group_stage_model
+        self.tournament_state.phase = "group_stage"
+        self.tournament_state.mark_dirty()
 
     def draw_group_match_controls(self):
         for widget in self.match_controls_frame.winfo_children():
@@ -521,6 +539,9 @@ class ControlWindow(ctk.CTkToplevel):
 
             self.teams.append(Team(name=team.name, logo=logo_path))
 
+        self.tournament_state.source_teams = self.teams[:]
+        self.tournament_state.mark_dirty()
+
     def build_bracket(self):
         if not self.teams:
             self.fill_team_list()
@@ -533,6 +554,10 @@ class ControlWindow(ctk.CTkToplevel):
 
         self.draw_match_controls()
         self.bracket_canvas.refresh()
+
+        self.tournament_state.bracket_model = self.tournament_model
+        self.tournament_state.phase = "bracket"
+        self.tournament_state.mark_dirty()
 
     def draw_match_controls(self):
         for widget in self.match_controls_frame.winfo_children():
@@ -550,8 +575,8 @@ class ControlWindow(ctk.CTkToplevel):
                 frame = ctk.CTkFrame(self.match_controls_frame)
                 frame.pack(pady=5, fill="x")
 
-                team1 = match.team1.name if match.team1 else "TBD"
-                team2 = match.team2.name if match.team2 else "TBD"
+                team1 = match.team1.name if match.team1 else t("tbd")
+                team2 = match.team2.name if match.team2 else t("tbd")
 
                 info_label = ctk.CTkLabel(
                     frame,
@@ -655,9 +680,10 @@ class ControlWindow(ctk.CTkToplevel):
         entry2.pack(pady=5)
 
         def save_edits():
-            new_team1 = entry1.get().strip() or "TBD"
-            new_team2 = entry2.get().strip() or "TBD"
+            new_team1 = entry1.get().strip()
+            new_team2 = entry2.get().strip()
             self.tournament_model.set_match_teams(round_index, match_index, new_team1, new_team2)
+
             edit_window.destroy()
             self.draw_match_controls()
             self.bracket_canvas.refresh()
