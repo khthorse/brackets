@@ -422,7 +422,7 @@ class ControlWindow(ctk.CTkToplevel):
     def go_back_to_setup(self):
         self.tournament_state.phase = "setup"
         self.tournament_state.mark_dirty()
-        self.update_ui_for_phase()
+        self._reset_match_controls_view()
 
     def go_back_to_group_stage(self):
         """Gå tilbake fra bracket til gruppespill hvis det finnes."""
@@ -453,14 +453,13 @@ class ControlWindow(ctk.CTkToplevel):
                 team.cups_hit = src.cups_hit
                 team.total_cups_diff = src.total_cups_diff
 
-        self.bracket_canvas.tournament_model = self.tournament_model
-        self.bracket_canvas.refresh()
-        self.draw_match_controls()
-        self.start_bracket_button.pack_forget()
-
         self.tournament_state.bracket_model = self.tournament_model
         self.tournament_state.phase = "bracket"
         self.tournament_state.mark_dirty()
+
+        self.bracket_canvas.tournament_model = self.tournament_model
+        self.bracket_canvas.refresh()
+        self.draw_match_controls()
         self.update_ui_for_phase()
 
     def toggle_load_logo(self):
@@ -564,15 +563,12 @@ class ControlWindow(ctk.CTkToplevel):
         self.group_stage_model = GroupStageModel(self.teams)
         self.group_stage_model.generate_matches()
 
-        self.bracket_canvas.show_group_stage(self.group_stage_model)
-        self.draw_group_match_controls()
-
-        self.start_group_button.pack_forget()
-        self.start_bracket_button.pack(pady=5)
-
         self.tournament_state.group_stage_model = self.group_stage_model
         self.tournament_state.phase = "group_stage"
         self.tournament_state.mark_dirty()
+
+        self.bracket_canvas.show_group_stage(self.group_stage_model)
+        self.draw_group_match_controls()
         self.update_ui_for_phase()
 
     def draw_group_match_controls(self):
@@ -775,13 +771,13 @@ class ControlWindow(ctk.CTkToplevel):
         for t in self.tournament_model.teams:
             t.logo = logo_by_name.get(t.name)
 
-        self.bracket_canvas.tournament_model = self.tournament_model
-        self.draw_match_controls()
-        self.bracket_canvas.refresh()
-
         self.tournament_state.bracket_model = self.tournament_model
         self.tournament_state.phase = "bracket"
         self.tournament_state.mark_dirty()
+
+        self.bracket_canvas.tournament_model = self.tournament_model
+        self.draw_match_controls()
+        self.bracket_canvas.refresh()
         self.update_ui_for_phase()
 
     def draw_match_controls(self):
