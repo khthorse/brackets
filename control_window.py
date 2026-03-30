@@ -125,6 +125,7 @@ class ControlWindow(ctk.CTkToplevel):
 
         self.draw_match_controls()
         self.teams = []
+        self.update_ui_for_phase()
 
     def _build_timer_controls(self):
         if not self.timers:
@@ -369,23 +370,19 @@ class ControlWindow(ctk.CTkToplevel):
             self.group_stage_model = self.tournament_state.group_stage_model
             self.draw_group_match_controls()
             self.bracket_canvas.show_group_stage(self.group_stage_model)
-            self.start_group_button.pack_forget()
-            self.start_bracket_button.pack(pady=5)
+            self.update_ui_for_phase()
             return
 
         if self.tournament_state.phase == "bracket" and self.tournament_state.bracket_model is not None:
             self.tournament_model = self.tournament_state.bracket_model
             self.draw_match_controls()
             self.bracket_canvas.refresh()
-            self.start_group_button.pack_forget()
-            self.start_bracket_button.pack_forget()
+            self.update_ui_for_phase()
             return
 
-        # setup / tom tilstand
         self.draw_match_controls()
         self.bracket_canvas.refresh()
-        self.start_bracket_button.pack_forget()
-        self.start_group_button.pack(pady=5)
+        self.update_ui_for_phase()
 
 
     def restart_current_tournament(self):
@@ -400,7 +397,9 @@ class ControlWindow(ctk.CTkToplevel):
         self.group_stage_model = None
 
         self.bracket_canvas.tournament_model = self.tournament_model
-        self._reset_match_controls_view()
+        self.draw_match_controls()
+        self.bracket_canvas.refresh()
+        self.update_ui_for_phase()
 
 
     def reset_everything(self):
@@ -418,9 +417,12 @@ class ControlWindow(ctk.CTkToplevel):
         self.draw_match_controls()
         self.bracket_canvas.refresh()
 
-        self.start_bracket_button.pack_forget()
-        self.start_group_button.pack(pady=5)
+        self.update_ui_for_phase()
 
+    def go_back_to_setup(self):
+        self.tournament_state.phase = "setup"
+        self.tournament_state.mark_dirty()
+        self.update_ui_for_phase()
 
     def go_back_to_group_stage(self):
         """Gå tilbake fra bracket til gruppespill hvis det finnes."""
@@ -433,17 +435,13 @@ class ControlWindow(ctk.CTkToplevel):
 
         self.bracket_canvas.show_group_stage(self.group_stage_model)
         self.draw_group_match_controls()
-
-        self.start_group_button.pack_forget()
-        self.start_bracket_button.pack(pady=5)
+        self.update_ui_for_phase()
 
     def build_final_bracket(self):
         standings = self.group_stage_model.standings()
         top_4 = standings[:4]
 
         self.tournament_model = self.tournament_state.bracket_model
-        self.tournament_model.build_bracket(top_4)
-
         self.tournament_model.build_bracket(top_4)
 
         top_4_by_name = {team.name: team for team in top_4}
@@ -463,6 +461,7 @@ class ControlWindow(ctk.CTkToplevel):
         self.tournament_state.bracket_model = self.tournament_model
         self.tournament_state.phase = "bracket"
         self.tournament_state.mark_dirty()
+        self.update_ui_for_phase()
 
     def toggle_load_logo(self):
         self.logo_switch = bool(self.load_logo_checkbox.get())
@@ -574,8 +573,11 @@ class ControlWindow(ctk.CTkToplevel):
         self.tournament_state.group_stage_model = self.group_stage_model
         self.tournament_state.phase = "group_stage"
         self.tournament_state.mark_dirty()
+        self.update_ui_for_phase()
 
     def draw_group_match_controls(self):
+        if not self.match_controls_frame.winfo_exists():
+            return
         for widget in self.match_controls_frame.winfo_children():
             widget.destroy()
 
@@ -780,8 +782,11 @@ class ControlWindow(ctk.CTkToplevel):
         self.tournament_state.bracket_model = self.tournament_model
         self.tournament_state.phase = "bracket"
         self.tournament_state.mark_dirty()
+        self.update_ui_for_phase()
 
     def draw_match_controls(self):
+        if not self.match_controls_frame.winfo_exists():
+            return
         for widget in self.match_controls_frame.winfo_children():
             widget.destroy()
 
