@@ -103,6 +103,25 @@ LANGUAGES = {
         "invalid_cups_winner_combo": "Ugyldig kombinasjon av kopper/vinner",
         "invalid_tiebreak_combo": "Ugyldig tie-break kombinasjon",
         "even_number_of_teams_required": "Antall lag bør være partall for dette oppsettet.",
+
+        "setup_section": "Oppsett",
+        "tournament_flow": "Turneringsflyt",
+        "back_to_group_stage": "Tilbake til gruppespill",
+        "restart_tournament": "Start på nytt",
+        "reset_all": "Nullstill alt",
+
+        "setup_section": "Oppsett",
+        "tournament_flow": "Turneringsflyt",
+        "back_to_setup": "Tilbake til oppsett",
+        "back_to_group_stage": "Tilbake til gruppespill",
+        "restart_tournament": "Start på nytt",
+        "reset_all": "Nullstill alt",
+        "confirm_restart_title": "Start på nytt",
+        "confirm_restart_message": "Vil du starte turneringen på nytt med de samme lagene? Alle resultater og oppsett nullstilles.",
+        "confirm_reset_title": "Nullstill alt",
+        "confirm_reset_message": "Vil du nullstille hele turneringen? Dette sletter alle lag, resultater og oppsett.",
+        "yes": "Ja",
+        "no": "Nei",
     },
 
     "en": {
@@ -208,6 +227,25 @@ LANGUAGES = {
         "invalid_cups_winner_combo": "Invalid cups/winner combination",
         "invalid_tiebreak_combo": "Invalid tie-break combination",
         "even_number_of_teams_required": "The number of teams must be even for this setup.",
+
+        "setup_section": "Setup",
+        "tournament_flow": "Tournament Flow",
+        "back_to_group_stage": "Back to Group Stage",
+        "restart_tournament": "Restart Tournament",
+        "reset_all": "Reset All",
+
+        "setup_section": "Setup",
+        "tournament_flow": "Tournament Flow",
+        "back_to_setup": "Back to Setup",
+        "back_to_group_stage": "Back to Group Stage",
+        "restart_tournament": "Restart Tournament",
+        "reset_all": "Reset All",
+        "confirm_restart_title": "Restart Tournament",
+        "confirm_restart_message": "Do you want to restart the tournament with the same teams? All results and setup will be reset.",
+        "confirm_reset_title": "Reset All",
+        "confirm_reset_message": "Do you want to reset the entire tournament? This deletes all teams, results, and setup.",
+        "yes": "Yes",
+        "no": "No",
     }
 }
 
