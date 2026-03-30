@@ -422,7 +422,7 @@ class ControlWindow(ctk.CTkToplevel):
     def go_back_to_setup(self):
         self.tournament_state.phase = "setup"
         self.tournament_state.mark_dirty()
-        self._reset_match_controls_view()
+        self.update_ui_for_phase()
 
     def go_back_to_group_stage(self):
         """Gå tilbake fra bracket til gruppespill hvis det finnes."""
@@ -441,23 +441,34 @@ class ControlWindow(ctk.CTkToplevel):
         standings = self.group_stage_model.standings()
         top_4 = standings[:4]
 
-        self.tournament_model = self.tournament_state.bracket_model
-        self.tournament_model.build_bracket(top_4)
+        existing_rounds = (
+            self.tournament_state.bracket_model.get_rounds()
+            if self.tournament_state.bracket_model is not None
+            else []
+        )
 
-        top_4_by_name = {team.name: team for team in top_4}
-        for team in self.tournament_model.teams:
-            src = top_4_by_name.get(team.name)
-            if src:
-                team.logo = src.logo
-                team.points = src.points
-                team.cups_hit = src.cups_hit
-                team.total_cups_diff = src.total_cups_diff
+        # Hvis sluttspill-bracket allerede finnes, gjenoppta den
+        if existing_rounds:
+            self.tournament_model = self.tournament_state.bracket_model
+        else:
+            self.tournament_model = self.tournament_state.bracket_model
+            self.tournament_model.build_bracket(top_4)
 
-        self.tournament_state.bracket_model = self.tournament_model
+            top_4_by_name = {team.name: team for team in top_4}
+            for team in self.tournament_model.teams:
+                src = top_4_by_name.get(team.name)
+                if src:
+                    team.logo = src.logo
+                    team.points = src.points
+                    team.cups_hit = src.cups_hit
+                    team.total_cups_diff = src.total_cups_diff
+
+            self.tournament_state.bracket_model = self.tournament_model
+
+        self.bracket_canvas.tournament_model = self.tournament_model
         self.tournament_state.phase = "bracket"
         self.tournament_state.mark_dirty()
 
-        self.bracket_canvas.tournament_model = self.tournament_model
         self.bracket_canvas.refresh()
         self.draw_match_controls()
         self.update_ui_for_phase()
@@ -560,10 +571,14 @@ class ControlWindow(ctk.CTkToplevel):
         if not self.teams:
             self.fill_team_list()
 
-        self.group_stage_model = GroupStageModel(self.teams)
-        self.group_stage_model.generate_matches()
+        # Hvis gruppespill allerede finnes, gjenoppta det
+        if self.tournament_state.group_stage_model is not None:
+            self.group_stage_model = self.tournament_state.group_stage_model
+        else:
+            self.group_stage_model = GroupStageModel(self.teams)
+            self.group_stage_model.generate_matches()
+            self.tournament_state.group_stage_model = self.group_stage_model
 
-        self.tournament_state.group_stage_model = self.group_stage_model
         self.tournament_state.phase = "group_stage"
         self.tournament_state.mark_dirty()
 
@@ -764,18 +779,29 @@ class ControlWindow(ctk.CTkToplevel):
         if not self.teams:
             self.fill_team_list()
 
-        self.tournament_model = self.tournament_state.bracket_model
-        self.tournament_model.build_bracket(self.teams)
+        # Hvis bracket allerede finnes, gjenoppta den
+        existing_rounds = (
+            self.tournament_state.bracket_model.get_rounds()
+            if self.tournament_state.bracket_model is not None
+            else []
+        )
 
-        logo_by_name = {t.name: t.logo for t in self.teams}
-        for t in self.tournament_model.teams:
-            t.logo = logo_by_name.get(t.name)
+        if existing_rounds:
+            self.tournament_model = self.tournament_state.bracket_model
+        else:
+            self.tournament_model = self.tournament_state.bracket_model
+            self.tournament_model.build_bracket(self.teams)
 
-        self.tournament_state.bracket_model = self.tournament_model
+            logo_by_name = {t.name: t.logo for t in self.teams}
+            for t in self.tournament_model.teams:
+                t.logo = logo_by_name.get(t.name)
+
+            self.tournament_state.bracket_model = self.tournament_model
+
+        self.bracket_canvas.tournament_model = self.tournament_model
         self.tournament_state.phase = "bracket"
         self.tournament_state.mark_dirty()
 
-        self.bracket_canvas.tournament_model = self.tournament_model
         self.draw_match_controls()
         self.bracket_canvas.refresh()
         self.update_ui_for_phase()
