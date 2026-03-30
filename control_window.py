@@ -4,7 +4,7 @@ import tkinter as tk
 
 from PIL import Image, ImageTk
 
-from models import GroupStageModel, Team
+from models import GroupStageModel, Team, TournamentModel
 from team_io import parse_team_file, teams_from_text
 from time_utils import normalize_time_input, is_valid_hhmm
 from translations import t
@@ -20,15 +20,21 @@ class ControlWindow(ctk.CTkToplevel):
         self.tournament_model = tournament_state.bracket_model
         self.bracket_canvas = bracket_canvas
         self.settings = settings
+        self.group_stage_model = tournament_state.group_stage_model
 
         self.title(t("control_window_title"))
         self.geometry("900x1080")
         self.timers = timers or []
 
-        team_entry_label = ctk.CTkLabel(self, text=t("enter_teams_one_per_line"))
+        self.setup_panel = ctk.CTkFrame(self)
+        self.setup_panel.pack(fill="x", padx=10, pady=10)
+
+        ctk.CTkLabel(self.setup_panel, text=t("setup_section"), font=("Arial", 20)).pack(pady=6)
+
+        team_entry_label = ctk.CTkLabel(self.setup_panel, text=t("enter_teams_one_per_line"))
         team_entry_label.pack(pady=5)
 
-        self.team_text = tk.Text(self, height=20, width=60)
+        self.team_text = tk.Text(self.setup_panel, height=12, width=60)
         self.team_text.pack(pady=5)
         self.team_text.insert(
             "1.0",
@@ -36,28 +42,81 @@ class ControlWindow(ctk.CTkToplevel):
             "Lag 9\nLag 10\nLag 11\nLag 12\nLag 13\nLag 14\nLag 15\nLag 16"
         )
 
-        set_teams_button = ctk.CTkButton(self, text=t("build_bracket"), command=self.build_bracket)
-        set_teams_button.pack(pady=5)
+        setup_button_row = ctk.CTkFrame(self.setup_panel)
+        setup_button_row.pack(fill="x", padx=10, pady=8)
 
-        load_from_file_btn = ctk.CTkButton(self, text=t("load_teams_from_file"), command=self.load_teams_from_file)
-        load_from_file_btn.pack(pady=5)
+        load_from_file_btn = ctk.CTkButton(
+            setup_button_row,
+            text=t("load_teams_from_file"),
+            command=self.load_teams_from_file
+        )
+        load_from_file_btn.pack(side="left", padx=6, pady=4)
 
         self.logo_switch = settings.ask_for_logos if settings is not None else False
         self.load_logo_checkbox = ctk.CTkCheckBox(
-            self,
+            setup_button_row,
             text=t("add_team_logos"),
             command=self.toggle_load_logo
         )
-        self.load_logo_checkbox.pack(pady=5)
+        self.load_logo_checkbox.pack(side="left", padx=6, pady=4)
 
         if self.logo_switch:
             self.load_logo_checkbox.select()
         else:
             self.load_logo_checkbox.deselect()
 
-        self.start_group_button = ctk.CTkButton(self, text=t("start_group_stage"), command=self.start_group_stage)
-        self.start_bracket_button = ctk.CTkButton(self, text=t("start_playoffs"), command=self.build_final_bracket)
-        self.start_group_button.pack(pady=5)
+        self.reset_all_button = ctk.CTkButton(
+            setup_button_row,
+            text=t("reset_all"),
+            command=self.confirm_reset_all
+        )
+        self.reset_all_button.pack(side="right", padx=6, pady=4)
+
+        self.flow_panel = ctk.CTkFrame(self)
+        self.flow_panel.pack(fill="x", padx=10, pady=10)
+
+        ctk.CTkLabel(self.flow_panel, text=t("tournament_flow"), font=("Arial", 20)).pack(pady=6)
+
+        flow_button_row = ctk.CTkFrame(self.flow_panel)
+        flow_button_row.pack(fill="x", padx=10, pady=8)
+
+        self.build_bracket_button = ctk.CTkButton(
+            flow_button_row,
+            text=t("build_bracket"),
+            command=self.build_bracket
+        )
+        self.build_bracket_button.pack(side="left", padx=6, pady=4)
+
+        self.start_group_button = ctk.CTkButton(
+            flow_button_row,
+            text=t("start_group_stage"),
+            command=self.start_group_stage
+        )
+        self.start_group_button.pack(side="left", padx=6, pady=4)
+
+        self.start_bracket_button = ctk.CTkButton(
+            flow_button_row,
+            text=t("start_playoffs"),
+            command=self.build_final_bracket
+        )
+
+        self.back_to_group_button = ctk.CTkButton(
+            flow_button_row,
+            text=t("back_to_group_stage"),
+            command=self.go_back_to_group_stage
+        )
+
+        self.back_to_setup_button = ctk.CTkButton(
+            flow_button_row,
+            text=t("back_to_setup"),
+            command=self.go_back_to_setup
+        )
+
+        self.restart_button = ctk.CTkButton(
+            flow_button_row,
+            text=t("restart_tournament"),
+            command=self.confirm_restart_tournament
+        )
 
         self._build_timer_controls()
 
@@ -221,9 +280,169 @@ class ControlWindow(ctk.CTkToplevel):
         except Exception:
             pass
 
+    def _show_setup_panel(self):
+        if not self.setup_panel.winfo_manager():
+            self.setup_panel.pack(fill="x", padx=10, pady=10, before=self.flow_panel)
+
+
+    def _hide_setup_panel(self):
+        if self.setup_panel.winfo_manager():
+            self.setup_panel.pack_forget()
+
+
+    def update_ui_for_phase(self):
+        phase = self.tournament_state.phase
+
+        self.start_bracket_button.pack_forget()
+        self.back_to_group_button.pack_forget()
+        self.back_to_setup_button.pack_forget()
+        self.restart_button.pack_forget()
+
+        if phase == "setup":
+            self._show_setup_panel()
+            if not self.build_bracket_button.winfo_manager():
+                self.build_bracket_button.pack(side="left", padx=6, pady=4)
+            if not self.start_group_button.winfo_manager():
+                self.start_group_button.pack(side="left", padx=6, pady=4)
+
+        elif phase == "group_stage":
+            self._hide_setup_panel()
+            self.build_bracket_button.pack_forget()
+            self.start_group_button.pack_forget()
+
+            self.start_bracket_button.pack(side="left", padx=6, pady=4)
+            self.back_to_setup_button.pack(side="left", padx=6, pady=4)
+            self.restart_button.pack(side="left", padx=6, pady=4)
+
+        elif phase == "bracket":
+            self._hide_setup_panel()
+            self.build_bracket_button.pack_forget()
+            self.start_group_button.pack_forget()
+
+            if self.tournament_state.group_stage_model is not None:
+                self.back_to_group_button.pack(side="left", padx=6, pady=4)
+
+            self.back_to_setup_button.pack(side="left", padx=6, pady=4)
+            self.restart_button.pack(side="left", padx=6, pady=4)
+
+        else:
+            self._show_setup_panel()
+            if not self.build_bracket_button.winfo_manager():
+                self.build_bracket_button.pack(side="left", padx=6, pady=4)
+            if not self.start_group_button.winfo_manager():
+                self.start_group_button.pack(side="left", padx=6, pady=4)
+
+    def _confirm_action(self, title, message, on_yes):
+        top = self._make_dialog(title, width=420, height=180)
+
+        ctk.CTkLabel(top, text=message, justify="center", wraplength=360).pack(padx=20, pady=20)
+
+        btn_row = ctk.CTkFrame(top)
+        btn_row.pack(pady=10)
+
+        ctk.CTkButton(btn_row, text=t("no"), command=top.destroy).pack(side="left", padx=6)
+
+        def _run_yes():
+            top.destroy()
+            on_yes()
+
+        ctk.CTkButton(btn_row, text=t("yes"), command=_run_yes).pack(side="left", padx=6)
+
+
+    def confirm_restart_tournament(self):
+        self._confirm_action(
+            t("confirm_restart_title"),
+            t("confirm_restart_message"),
+            self.restart_current_tournament,
+        )
+
+
+    def confirm_reset_all(self):
+        self._confirm_action(
+            t("confirm_reset_title"),
+            t("confirm_reset_message"),
+            self.reset_everything,
+        )
+
+    def _reset_match_controls_view(self):
+        if self.tournament_state.phase == "group_stage" and self.tournament_state.group_stage_model is not None:
+            self.group_stage_model = self.tournament_state.group_stage_model
+            self.draw_group_match_controls()
+            self.bracket_canvas.show_group_stage(self.group_stage_model)
+            self.start_group_button.pack_forget()
+            self.start_bracket_button.pack(pady=5)
+            return
+
+        if self.tournament_state.phase == "bracket" and self.tournament_state.bracket_model is not None:
+            self.tournament_model = self.tournament_state.bracket_model
+            self.draw_match_controls()
+            self.bracket_canvas.refresh()
+            self.start_group_button.pack_forget()
+            self.start_bracket_button.pack_forget()
+            return
+
+        # setup / tom tilstand
+        self.draw_match_controls()
+        self.bracket_canvas.refresh()
+        self.start_bracket_button.pack_forget()
+        self.start_group_button.pack(pady=5)
+
+
+    def restart_current_tournament(self):
+        """Start på nytt med samme lag."""
+        teams_copy = self.tournament_state.source_teams[:]
+
+        self.tournament_state.reset_to_setup(keep_teams=True)
+
+        self.teams = teams_copy[:]
+        self.tournament_model = TournamentModel(settings=self.settings)
+        self.tournament_state.bracket_model = self.tournament_model
+        self.group_stage_model = None
+
+        self.bracket_canvas.tournament_model = self.tournament_model
+        self._reset_match_controls_view()
+
+
+    def reset_everything(self):
+        """Full reset, også laglisten."""
+        self.tournament_state.reset_to_setup(keep_teams=False)
+
+        self.teams = []
+        self.group_stage_model = None
+        self.tournament_model = TournamentModel(settings=self.settings)
+        self.tournament_state.bracket_model = self.tournament_model
+
+        self.bracket_canvas.tournament_model = self.tournament_model
+
+        self.team_text.delete("1.0", "end")
+        self.draw_match_controls()
+        self.bracket_canvas.refresh()
+
+        self.start_bracket_button.pack_forget()
+        self.start_group_button.pack(pady=5)
+
+
+    def go_back_to_group_stage(self):
+        """Gå tilbake fra bracket til gruppespill hvis det finnes."""
+        if self.tournament_state.group_stage_model is None:
+            return
+
+        self.tournament_state.reset_bracket()
+        self.group_stage_model = self.tournament_state.group_stage_model
+        self.tournament_model = self.tournament_state.bracket_model
+
+        self.bracket_canvas.show_group_stage(self.group_stage_model)
+        self.draw_group_match_controls()
+
+        self.start_group_button.pack_forget()
+        self.start_bracket_button.pack(pady=5)
+
     def build_final_bracket(self):
         standings = self.group_stage_model.standings()
         top_4 = standings[:4]
+
+        self.tournament_model = self.tournament_state.bracket_model
+        self.tournament_model.build_bracket(top_4)
 
         self.tournament_model.build_bracket(top_4)
 
@@ -236,6 +455,7 @@ class ControlWindow(ctk.CTkToplevel):
                 team.cups_hit = src.cups_hit
                 team.total_cups_diff = src.total_cups_diff
 
+        self.bracket_canvas.tournament_model = self.tournament_model
         self.bracket_canvas.refresh()
         self.draw_match_controls()
         self.start_bracket_button.pack_forget()
@@ -546,12 +766,14 @@ class ControlWindow(ctk.CTkToplevel):
         if not self.teams:
             self.fill_team_list()
 
+        self.tournament_model = self.tournament_state.bracket_model
         self.tournament_model.build_bracket(self.teams)
 
         logo_by_name = {t.name: t.logo for t in self.teams}
         for t in self.tournament_model.teams:
             t.logo = logo_by_name.get(t.name)
 
+        self.bracket_canvas.tournament_model = self.tournament_model
         self.draw_match_controls()
         self.bracket_canvas.refresh()
 
