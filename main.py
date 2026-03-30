@@ -9,7 +9,12 @@ from bracket_canvas import TournamentBracketCanvas
 from control_window import ControlWindow
 from translations import t, set_language
 from settings import AppSettings
-from display_utils import get_monitor_by_index, apply_borderless_fullscreen, apply_windowed_on_monitor
+from display_utils import (
+    get_monitor_by_index,
+    get_secondary_monitor,
+    apply_borderless_fullscreen,
+    apply_windowed_on_monitor,
+)
 from tournament_state import TournamentState
 
 
@@ -200,8 +205,12 @@ control_window = ControlWindow(
     settings=settings,
 )
 
-#fullscreen_button = ctk.CTkButton(master=timer_frame, text='Fullskjerm', command=fullscreen())
-#fullscreen_button.pack(pady=12, padx=10)
+control_monitor = get_secondary_monitor(settings.fullscreen_monitor_index)
+
+control_window.update_idletasks()
+control_window.geometry(
+    f"{control_monitor.work_width}x{control_monitor.work_height}+{control_monitor.work_left}+{control_monitor.work_top}"
+)
 
 
 root.mainloop()
