@@ -22,11 +22,15 @@ LANGUAGES = {
 
         "enter_teams_one_per_line": "Skriv inn lag (én per linje):",
         "build_bracket": "Bygg Brakett",
+        "continue_bracket": "Fortsett Brakett",
         "load_teams_from_file": "Last lag fra fil...",
         "add_team_logos": "Legg til laglogoer",
         "start_group_stage": "Start Gruppespill",
+        "continue_group_stage": "Fortsett Gruppespill",
         "start_playoffs": "Start Sluttspill",
+        "continue_playoffs": "Fortsett Sluttspill",
         "team_label": "Lag",
+        
 
         "display_section": "Visning",
         "display_section": "Visning",
@@ -157,10 +161,13 @@ LANGUAGES = {
 
         "enter_teams_one_per_line": "Enter teams (one per line):",
         "build_bracket": "Build Bracket",
+        "continue_bracket": "Continue Bracket",
         "load_teams_from_file": "Load teams from file...",
         "add_team_logos": "Add team logos",
         "start_group_stage": "Start Group Stage",
+        "continue_group_stage": "Continue Group Stage",
         "start_playoffs": "Start Playoffs",
+        "continue_playoffs": "Continue Playoffs",
         "team_label": "Team",
 
         "display_section": "Display",

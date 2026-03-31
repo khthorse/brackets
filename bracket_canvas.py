@@ -18,13 +18,132 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         self.settings = settings
 
         self.pack(fill="both", expand=True)
+
+        self.images = []
+        self.logo_cache = {}
+        self.group_stage_model = None
+        self._group_stage_rebuild_job = None
+        self._group_stage_frames = None
+        self.previous_standings_positions = {}
+
+        self.bracket_view = ctk.CTkFrame(self, fg_color="#2b2b2b")
+        self.bracket_view.pack(fill="both", expand=True)
+
         canvas_bg = "#2B2B2B"
-        self.canvas = tk.Canvas(self, bg=canvas_bg, highlightthickness=0, bd=0)
+        self.canvas = tk.Canvas(self.bracket_view, bg=canvas_bg, highlightthickness=0, bd=0)
         self.canvas.pack(fill="both", expand=True)
         self.canvas.bind("<Configure>", lambda event: self.draw_bracket())
 
-        self.images = []
-        self.draw_bracket()
+        self.group_stage_view = ctk.CTkFrame(self, fg_color="#2b2b2b")
+
+    def _create_stat_box(self, parent, row, column, value, row_height):
+        box = ctk.CTkFrame(
+            parent,
+            fg_color="#1f1f1f",
+            corner_radius=max(6, int(row_height * 0.18))
+        )
+        box.grid(row=row, column=column, padx=4, pady=2, sticky="nsew")
+
+        ctk.CTkLabel(
+            box,
+            text=value,
+            font=("Consolas", max(9, int(row_height * 0.28)), "bold"),
+        ).pack(padx=8, pady=3)
+
+    def get_position_trend(self, team_name, current_position):
+        previous_position = self.previous_standings_positions.get(team_name)
+
+        if previous_position is None:
+            return "–", "#aaaaaa"
+
+        if current_position < previous_position:
+            return "↑", "#2faa6a"
+
+        if current_position > previous_position:
+            return "↓", "#d9534f"
+
+        return "–", "#aaaaaa"
+    
+    def get_team_form(self, team_name, matches, limit=3):
+        results = []
+
+        for match in matches:
+            if not match.played:
+                continue
+
+            if not match.team1 or not match.team2:
+                continue
+
+            if match.team1.name != team_name and match.team2.name != team_name:
+                continue
+
+            winner = match.winner
+
+            if winner == 1:
+                winning_name = match.team1.name
+            elif winner == 2:
+                winning_name = match.team2.name
+            else:
+                winning_name = None
+
+            if winning_name is None:
+                results.append("U")
+            elif winning_name == team_name:
+                results.append("V")
+            else:
+                results.append("T")
+
+        return results[-limit:]
+    
+    def _create_form_boxes(self, parent, row, column, form_list, row_height):
+        wrapper = ctk.CTkFrame(parent, fg_color="transparent")
+        wrapper.grid(row=row, column=column, padx=6, pady=max(2, int(row_height * 0.12)))
+
+        colors = {
+            "V": "#2faa6a",
+            "T": "#d9534f",
+            "U": "#c9a227",
+        }
+
+        if not form_list:
+            ctk.CTkLabel(wrapper, text="–", text_color="#aaaaaa", font=("Arial", max(9, int(row_height * 0.26)))).pack()
+            return
+
+        box_size = max(18, int(row_height * 0.5))
+
+        for result in form_list:
+            color = colors.get(result, "#666666")
+            box = ctk.CTkFrame(
+                wrapper,
+                fg_color=color,
+                corner_radius=max(5, int(box_size * 0.28)),
+                width=box_size,
+                height=box_size,
+            )
+            box.pack(side="left", padx=2)
+            box.pack_propagate(False)
+
+            ctk.CTkLabel(
+                box,
+                text=result,
+                font=("Arial", max(8, int(box_size * 0.42)), "bold"),
+                text_color="white",
+            ).pack(expand=True)
+
+    def show_bracket_view(self):
+        if self.group_stage_view.winfo_manager():
+            self.group_stage_view.pack_forget()
+
+        if not self.bracket_view.winfo_manager():
+            self.bracket_view.pack(fill="both", expand=True)
+
+
+    def show_group_stage_view(self):
+        if self.bracket_view.winfo_manager():
+            self.bracket_view.pack_forget()
+
+        if not self.group_stage_view.winfo_manager():
+            self.group_stage_view.pack(fill="both", expand=True)
 
     def show_winner_popup(self, winner):
         canvas_width = self.canvas.winfo_width()
@@ -133,211 +252,264 @@ class TournamentBracketCanvas(ctk.CTkFrame):
                     anchor=anchor,
                 )
 
-    def show_group_stage(self, group_stage_model):
-        self.group_stage_model = group_stage_model
-        self.canvas.delete("all")
-        self.images.clear()
+    def _schedule_group_stage_rebuild(self, delay=30):
+        if self._group_stage_rebuild_job is not None:
+            try:
+                self.after_cancel(self._group_stage_rebuild_job)
+            except Exception:
+                pass
 
-        standings = group_stage_model.standings()
-        matches = group_stage_model.matches
+        self._group_stage_rebuild_job = self.after(delay, self._rebuild_group_stage_view)
 
-        canvas_width = self.canvas.winfo_width()
-        canvas_height = self.canvas.winfo_height()
 
-        if canvas_width < 10 or canvas_height < 10 or not standings:
+    def _rebuild_group_stage_view(self):
+        self._group_stage_rebuild_job = None
+
+        if self.group_stage_model is None:
             return
 
-        scale = canvas_height / 1080
-        scale = max(0.75, min(1.6, scale))
+        if self._group_stage_frames is None:
+            return
 
-        title_font = max(18, int(30 * scale))
-        section_font = max(14, int(24 * scale))
+        standings_frame, matches_frame = self._group_stage_frames
 
-        start_y = int(80 * scale)
-        box_pady = max(3, int(5 * scale))
-        box_padx = max(6, int(10 * scale))
+        if not standings_frame.winfo_exists() or not matches_frame.winfo_exists():
+            return
 
-        total_rows = len(standings) + 1 
-        box_height = (canvas_height - start_y - 2 * box_pady) / total_rows
-        box_width = (canvas_width / 2) - 2 * box_padx
-        box2_width = (canvas_width * 4 / 10) - 2 * box_padx
+        # Vent til layout faktisk er klar
+        if standings_frame.winfo_width() <= 10 or standings_frame.winfo_height() <= 10:
+            self._schedule_group_stage_rebuild(delay=30)
+            return
 
-        thumbnail_size = max(18, int(box_height - 4 * box_pady))
-        fontsize = max(10, int(min(box_height / 4, 22 * scale)))
-        small_fontsize = max(8, int(fontsize * 3 / 4))
-        time_fontsize = max(8, int(fontsize * 4 / 5))
+        if matches_frame.winfo_width() <= 10 or matches_frame.winfo_height() <= 10:
+            self._schedule_group_stage_rebuild(delay=30)
+            return
 
-        self.canvas.create_text(
-            canvas_width / 2,
-            int(30 * scale),
+        for child in standings_frame.winfo_children():
+            child.destroy()
+        for child in matches_frame.winfo_children():
+            child.destroy()
+
+        standings = self.group_stage_model.standings()
+        matches = self.group_stage_model.matches
+
+        self.build_group_stage_standings(standings_frame, standings, matches)
+        self.build_group_stage_matches(matches_frame, matches)
+
+    def show_group_stage(self, group_stage_model):
+        self.group_stage_model = group_stage_model
+        self.show_group_stage_view()
+
+        for child in self.group_stage_view.winfo_children():
+            child.destroy()
+
+        title = ctk.CTkLabel(
+            self.group_stage_view,
             text=t("group_stage"),
-            font=("Arial", title_font),
-            fill="white",
+            font=("Arial", 28, "bold"),
         )
+        title.pack(pady=(6, 4))
 
-        self.canvas.create_text(
-            canvas_width / 4,
-            start_y - 6 * box_pady,
+        content = ctk.CTkFrame(self.group_stage_view, fg_color="transparent")
+        content.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+
+        content.grid_columnconfigure(0, weight=1)
+        content.grid_columnconfigure(1, weight=4)
+        content.grid_columnconfigure(2, weight=1)
+        content.grid_columnconfigure(3, weight=4)
+        content.grid_columnconfigure(4, weight=1)
+        content.grid_rowconfigure(0, weight=1)
+
+        standings_frame = ctk.CTkFrame(content, fg_color="#2b2b2b")
+        standings_frame.grid(row=0, column=1, sticky="nsew", padx=(0, 10))
+
+        matches_frame = ctk.CTkFrame(content, fg_color="#2b2b2b")
+        matches_frame.grid(row=0, column=3, sticky="nsew", padx=(10, 0))
+
+        self._group_stage_frames = (standings_frame, matches_frame)
+
+        # Rebuild når layout er klar
+        self._schedule_group_stage_rebuild(delay=30)
+
+        # Rebuild ved resize, men debounce-et
+        standings_frame.bind("<Configure>", lambda _e: self._schedule_group_stage_rebuild(delay=60))
+        matches_frame.bind("<Configure>", lambda _e: self._schedule_group_stage_rebuild(delay=60))
+
+    def build_group_stage_standings(self, parent, standings, matches):
+        title = ctk.CTkLabel(
+            parent,
             text=t("standings"),
-            font=("Arial", section_font),
-            fill="white",
+            font=("Arial", 22, "bold"),
         )
+        title.pack(pady=(5, 6))
+        
+        available_height = parent.winfo_height()
+        available_width = parent.winfo_width()
 
-        table_x = box_padx
-        table_y = start_y
-        table_width = box_width - 2 * box_padx
-        table_row_height = max(24, int(box_height))
+        title_height = 42
+        header_height = 30
+        top_bottom_padding = 6
 
-        self.draw_standings_table(
-            x=table_x,
-            y=table_y,
-            width=table_width,
-            row_height=table_row_height,
-            standings=standings,
-            scale=scale,
-        )
+        row_count = max(1, len(standings))
+        usable_height = available_height - title_height - header_height - top_bottom_padding
+        row_height = int(usable_height / row_count)
+        row_height = max(14, row_height)
 
-        matches_start_y = start_y
-        matches_start_x = box_width + 0.5 * box_width + 2 * box_padx - box2_width / 2
+        header = ctk.CTkFrame(parent, fg_color="transparent", height=header_height)
+        header.pack(fill="x", padx=8, pady=(0, 6))
+        header.pack_propagate(False)
 
-        self.canvas.create_text(
-            3 * canvas_width / 4,
-            matches_start_y - 6 * box_pady,
+        header.grid_columnconfigure(0, weight=1)
+        header.grid_columnconfigure(1, weight=1)
+        header.grid_columnconfigure(2, weight=5)
+        header.grid_columnconfigure(3, weight=1)
+        header.grid_columnconfigure(4, weight=1)
+        header.grid_columnconfigure(5, weight=1)
+
+        ctk.CTkLabel(header, text="", font=("Arial", 14, "bold")).grid(row=0, column=0, padx=4, pady=2)
+        ctk.CTkLabel(header, text="#", font=("Arial", 14, "bold")).grid(row=0, column=1, padx=4, pady=2)
+        ctk.CTkLabel(header, text=t("team_label"), font=("Arial", 14, "bold")).grid(row=0, column=2, padx=6, pady=2, sticky="w")
+        ctk.CTkLabel(header, text=t("points_short"), font=("Arial", 14, "bold")).grid(row=0, column=3, padx=4, pady=2)
+        ctk.CTkLabel(header, text=t("hit_short"), font=("Arial", 14, "bold")).grid(row=0, column=4, padx=4, pady=2)
+        ctk.CTkLabel(header, text=t("diff_short"), font=("Arial", 14, "bold")).grid(row=0, column=5, padx=4, pady=2)
+
+        rows = ctk.CTkFrame(parent, fg_color="transparent")
+        rows.pack(fill="both", expand=True, padx=4, pady=0)
+
+        for idx, team in enumerate(standings, start=1):
+            is_qualified = idx <= 4
+            row_color = "#3a3a3a" if is_qualified else "#333333"
+
+            row = ctk.CTkFrame(
+                rows,
+                fg_color=row_color,
+                corner_radius=10,
+                height=row_height,
+            )
+            row.pack(fill="x", padx=6, pady=2, expand=True)
+            row.pack_propagate(False)
+
+            row.grid_columnconfigure(0, weight=1)
+            row.grid_columnconfigure(1, weight=1)
+            row.grid_columnconfigure(2, weight=5)
+            row.grid_columnconfigure(3, weight=1)
+            row.grid_columnconfigure(4, weight=1)
+            row.grid_columnconfigure(5, weight=1)
+
+            ctk.CTkLabel(
+                row,
+                text="",
+                font=("Arial", 12),
+            ).grid(row=0, column=0, padx=4, pady=2)
+
+            ctk.CTkLabel(
+                row,
+                text=str(idx),
+                font=("Arial", 12),
+            ).grid(row=0, column=1, padx=4, pady=2)
+
+            ctk.CTkLabel(
+                row,
+                text=team.name,
+                font=("Arial", 12),
+            ).grid(row=0, column=2, padx=6, pady=2, sticky="w")
+
+            ctk.CTkLabel(
+                row,
+                text=str(team.points),
+                font=("Arial", 12),
+            ).grid(row=0, column=3, padx=4, pady=2)
+
+            ctk.CTkLabel(
+                row,
+                text=str(team.cups_hit),
+                font=("Arial", 12),
+            ).grid(row=0, column=4, padx=4, pady=2)
+
+            ctk.CTkLabel(
+                row,
+                text=str(team.total_cups_diff),
+                font=("Arial", 12),
+            ).grid(row=0, column=5, padx=4, pady=2)
+
+    def build_group_stage_matches(self, parent, matches):
+        print("STANDINGS parent height:", parent.winfo_height())
+        print("STANDINGS root height:", self.group_stage_view.winfo_height())
+        
+        available_height = parent.winfo_height()
+        available_width = parent.winfo_width()
+
+        title_height = 50
+        bottom_margin = 12
+
+        row_count = max(1, len(matches))
+        row_height = (available_height - title_height - bottom_margin) / row_count
+        row_height = max(32, min(120, int(row_height)))
+
+        title_font = max(14, int(row_height * 0.42))
+        time_font = max(8, int(row_height * 0.22))
+        team_font = max(9, int(row_height * 0.24))
+        vs_font = max(9, int(row_height * 0.24))
+
+        title = ctk.CTkLabel(
+            parent,
             text=t("matches"),
-            font=("Arial", section_font),
-            fill="white",
+            font=("Arial", title_font, "bold"),
         )
+        title.pack(pady=(10, 12))
 
-        for idx, match in enumerate(matches, start=1):
-            box_x0 = matches_start_x + box_padx
-            box_y0 = start_y + box_pady + (idx - 1) * box_height
-            box_x1 = matches_start_x + box2_width - box_padx
-            box_y1 = box_y0 - box_pady + box_height
+        rows = ctk.CTkFrame(parent, fg_color="transparent")
+        rows.pack(fill="both", expand=True, padx=4, pady=0)
 
-            self.canvas.create_rectangle(box_x0, box_y0, box_x1, box_y1, fill="#333333")
+        for match in matches:
+            row = ctk.CTkFrame(
+                rows,
+                fg_color="#333333",
+                corner_radius=max(8, int(row_height * 0.18)),
+                height=row_height,
+            )
+            row.pack(fill="x", padx=6, pady=2, expand=True)
+            row.pack_propagate(False)
 
-            time_ypos = box_y1 + box_pady - box_height / 2 - box_height / 4
-            text_ypos = box_y1 + box_pady - box_height / 2
-            teamname1_x = matches_start_x + box2_width / 4 + thumbnail_size
-            teamname2_x = matches_start_x + 3 * box2_width / 4 - thumbnail_size
-            center_x = matches_start_x + box2_width / 2
+            row.grid_columnconfigure(0, weight=2)  # tid
+            row.grid_columnconfigure(1, weight=4)  # team1
+            row.grid_columnconfigure(2, weight=1)  # vs
+            row.grid_columnconfigure(3, weight=4)  # team2
 
             team1_name = match.team1.name if match.team1 else t("tbd")
             team2_name = match.team2.name if match.team2 else t("tbd")
+            time_text = match.time if match.time else t("tbd")
 
-            if match.time:
-                y_match = text_ypos + box_height / 6
+            font1 = ("Arial", team_font, "overstrike") if match.played and match.winner == 2 else ("Arial", team_font)
+            font2 = ("Arial", team_font, "overstrike") if match.played and match.winner == 1 else ("Arial", team_font)
 
-                if match.played:
-                    self.canvas.create_text(
-                        teamname1_x,
-                        y_match,
-                        text=team1_name,
-                        font=("Arial", small_fontsize, "overstrike"),
-                        fill="white",
-                        justify="left",
-                    )
-                    self.canvas.create_text(
-                        center_x,
-                        y_match,
-                        text=t("vs"),
-                        font=("Arial", fontsize),
-                        fill="white",
-                    )
-                    self.canvas.create_text(
-                        teamname2_x,
-                        y_match,
-                        text=team2_name,
-                        font=("Arial", small_fontsize),
-                        fill="white",
-                        justify="right",
-                    )
-                else:
-                    self.canvas.create_text(
-                        teamname1_x,
-                        y_match,
-                        text=team1_name,
-                        font=("Arial", small_fontsize),
-                        fill="white",
-                        justify="left",
-                    )
-                    self.canvas.create_text(
-                        center_x,
-                        y_match,
-                        text=t("vs"),
-                        font=("Arial", fontsize),
-                        fill="white",
-                    )
-                    self.canvas.create_text(
-                        teamname2_x,
-                        y_match,
-                        text=team2_name,
-                        font=("Arial", small_fontsize),
-                        fill="white",
-                        justify="right",
-                    )
+            ctk.CTkLabel(
+                row,
+                text=time_text,
+                font=("Arial", time_font),
+                text_color="#cccccc",
+            ).grid(row=0, column=0, padx=6, pady=4, sticky="w")
 
-                self.canvas.create_text(
-                    center_x,
-                    time_ypos,
-                    text=t("starts_at").format(time=match.time),
-                    font=("Arial", time_fontsize),
-                    fill="white",
-                )
-            else:
-                self.canvas.create_text(
-                    teamname1_x,
-                    text_ypos,
-                    text=team1_name,
-                    font=("Arial", small_fontsize),
-                    fill="white",
-                    justify="left",
-                )
-                self.canvas.create_text(
-                    center_x,
-                    text_ypos,
-                    text=t("vs"),
-                    font=("Arial", fontsize),
-                    fill="white",
-                )
-                self.canvas.create_text(
-                    teamname2_x,
-                    text_ypos,
-                    text=team2_name,
-                    font=("Arial", small_fontsize),
-                    fill="white",
-                    justify="right",
-                )
+            ctk.CTkLabel(
+                row,
+                text=team1_name,
+                font=font1,
+            ).grid(row=0, column=1, padx=6, pady=4, sticky="e")
 
-            if match.team1 and match.team1.logo:
-                try:
-                    img = Image.open(match.team1.logo)
-                    img.thumbnail((thumbnail_size, thumbnail_size), Image.LANCZOS)
-                    logo_img = ImageTk.PhotoImage(img)
-                    self.canvas.create_image(
-                        matches_start_x + box2_width / 8,
-                        text_ypos - box_pady / 2,
-                        image=logo_img,
-                    )
-                    self.images.append(logo_img)
-                except Exception as e:
-                    print(f"Error loading logo: {e}")
+            ctk.CTkLabel(
+                row,
+                text=t("vs"),
+                font=("Arial", vs_font, "bold"),
+            ).grid(row=0, column=2, padx=6, pady=4)
 
-            if match.team2 and match.team2.logo:
-                try:
-                    img = Image.open(match.team2.logo)
-                    img.thumbnail((thumbnail_size, thumbnail_size), Image.LANCZOS)
-                    logo_img = ImageTk.PhotoImage(img)
-                    self.canvas.create_image(
-                        matches_start_x + box2_width * 7 / 8,
-                        text_ypos - box_pady / 2,
-                        image=logo_img,
-                    )
-                    self.images.append(logo_img)
-                except Exception as e:
-                    print(f"Error loading logo: {e}")
+            ctk.CTkLabel(
+                row,
+                text=team2_name,
+                font=font2,
+            ).grid(row=0, column=3, padx=6, pady=4, sticky="w")
 
     def draw_bracket(self):
+        self.show_bracket_view()
         self.canvas.delete("all")
         rounds = self.tournament_model.get_rounds()
 
