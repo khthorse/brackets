@@ -18,6 +18,9 @@ LANGUAGES = {
         "points_short": "P",
         "hit_short": "T",
         "diff_short": "D",
+        "points_label": "Poeng",
+        "hit_label": "Treff",
+        "diff_label": "Diff",
         "points_hit_diff_header": "P    |    T    |    D",
 
         "enter_teams_one_per_line": "Skriv inn lag (én per linje):",
@@ -157,6 +160,9 @@ LANGUAGES = {
         "points_short": "Pts",
         "hit_short": "Hit",
         "diff_short": "Diff",
+        "points_label": "Points",
+        "hit_label": "Hits",
+        "diff_label": "Diff",
         "points_hit_diff_header": "Pts    |    Hit    |    Diff",
 
         "enter_teams_one_per_line": "Enter teams (one per line):",
