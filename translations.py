@@ -26,6 +26,7 @@ LANGUAGES = {
         "add_team_logos": "Legg til laglogoer",
         "start_group_stage": "Start Gruppespill",
         "start_playoffs": "Start Sluttspill",
+        "team_label": "Lag",
 
         "display_section": "Visning",
         "display_section": "Visning",
@@ -160,6 +161,7 @@ LANGUAGES = {
         "add_team_logos": "Add team logos",
         "start_group_stage": "Start Group Stage",
         "start_playoffs": "Start Playoffs",
+        "team_label": "Team",
 
         "display_section": "Display",
         "display_section": "Display",

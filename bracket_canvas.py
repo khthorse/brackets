@@ -60,6 +60,79 @@ class TournamentBracketCanvas(ctk.CTkFrame):
             except Exception as e:
                 print(f"Error when loading logo: {e}")
 
+    def draw_standings_table(self, x, y, width, row_height, standings, scale):
+        headers = ["#", t("team_label"), t("points_short"), t("hit_short"), t("diff_short")]
+
+        # Kolonnebredder som andel av total bredde
+        col_widths = [0.08, 0.52, 0.13, 0.13, 0.14]
+
+        header_font = ("Arial", max(10, int(14 * scale)), "bold")
+        cell_font = ("Arial", max(9, int(13 * scale)))
+
+        # Regn ut x-posisjoner for kolonnene
+        col_x = [x]
+        for fraction in col_widths:
+            col_x.append(col_x[-1] + fraction * width)
+
+        # Header-rad
+        for i, header in enumerate(headers):
+            self.canvas.create_rectangle(
+                col_x[i],
+                y,
+                col_x[i + 1],
+                y + row_height,
+                fill="#2b2b2b",
+                outline="#444444",
+            )
+
+            self.canvas.create_text(
+                (col_x[i] + col_x[i + 1]) / 2,
+                y + row_height / 2,
+                text=header,
+                fill="white",
+                font=header_font,
+            )
+
+        # Datarader
+        for row_idx, team in enumerate(standings):
+            row_y0 = y + row_height * (row_idx + 1)
+            row_y1 = row_y0 + row_height
+
+            values = [
+                str(row_idx + 1),
+                team.name,
+                str(team.points),
+                str(team.cups_hit),
+                str(team.total_cups_diff),
+            ]
+
+            for i, value in enumerate(values):
+                self.canvas.create_rectangle(
+                    col_x[i],
+                    row_y0,
+                    col_x[i + 1],
+                    row_y1,
+                    fill="#333333",
+                    outline="#444444",
+                )
+
+                # Venstrejuster bare lagnavn
+                if i == 1:
+                    text_x = col_x[i] + 10
+                    anchor = "w"
+                else:
+                    text_x = (col_x[i] + col_x[i + 1]) / 2
+                    anchor = "center"
+
+                self.canvas.create_text(
+                    text_x,
+                    (row_y0 + row_y1) / 2,
+                    text=value,
+                    fill="white",
+                    font=cell_font,
+                    anchor=anchor,
+                )
+
     def show_group_stage(self, group_stage_model):
         self.group_stage_model = group_stage_model
         self.canvas.delete("all")
@@ -84,7 +157,8 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         box_pady = max(3, int(5 * scale))
         box_padx = max(6, int(10 * scale))
 
-        box_height = (canvas_height - start_y - 2 * box_pady) / len(standings)
+        total_rows = len(standings) + 1 
+        box_height = (canvas_height - start_y - 2 * box_pady) / total_rows
         box_width = (canvas_width / 2) - 2 * box_padx
         box2_width = (canvas_width * 4 / 10) - 2 * box_padx
 
@@ -109,49 +183,19 @@ class TournamentBracketCanvas(ctk.CTkFrame):
             fill="white",
         )
 
-        for idx, team in enumerate(standings, start=1):
-            box_x0 = box_padx
-            box_y0 = start_y + box_pady + (idx - 1) * box_height
-            box_x1 = box_width - box_padx
-            box_y1 = box_y0 - box_pady + box_height
+        table_x = box_padx
+        table_y = start_y
+        table_width = box_width - 2 * box_padx
+        table_row_height = max(24, int(box_height))
 
-            self.canvas.create_rectangle(box_x0, box_y0, box_x1, box_y1, fill="#333333")
-
-            text_ypos = box_y1 + box_pady - box_height / 2
-            teamname_x = box_width / 4
-            results_x = 3 * box_width / 4
-
-            self.canvas.create_text(
-                teamname_x,
-                text_ypos,
-                text=f"{idx}. {team.name}",
-                font=("Arial", fontsize),
-                fill="white",
-                anchor="w",
-            )
-
-            self.canvas.create_text(
-                results_x,
-                text_ypos,
-                text=f"{t('points_hit_diff_header')}\n{team.points}    |    {team.cups_hit}    |    {team.total_cups_diff}",
-                font=("Arial", fontsize),
-                fill="white",
-                justify="left",
-            )
-
-            if team.logo:
-                try:
-                    img = Image.open(team.logo)
-                    img.thumbnail((thumbnail_size, thumbnail_size), Image.LANCZOS)
-                    logo_img = ImageTk.PhotoImage(img)
-                    self.canvas.create_image(
-                        box_width / 8,
-                        text_ypos - box_pady / 2,
-                        image=logo_img,
-                    )
-                    self.images.append(logo_img)
-                except Exception as e:
-                    print(f"Error loading logo: {e}")
+        self.draw_standings_table(
+            x=table_x,
+            y=table_y,
+            width=table_width,
+            row_height=table_row_height,
+            standings=standings,
+            scale=scale,
+        )
 
         matches_start_y = start_y
         matches_start_x = box_width + 0.5 * box_width + 2 * box_padx - box2_width / 2
