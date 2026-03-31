@@ -410,9 +410,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
             fg_color=row_color,
             corner_radius=row_corner,
         )
-        row.pack(fill="both", padx=4, pady=row_gap, expand=True)
-        row.pack_propagate(False)
-        #row.grid_propagate(False)
+        row.grid_propagate(False)
 
         row.grid_columnconfigure(0, weight=1, minsize=26)
         row.grid_columnconfigure(1, weight=1, minsize=34)
@@ -439,7 +437,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         name_wrap.grid(row=0, column=2, padx=row_inner_padx, pady=row_inner_pady, sticky="w")
 
         logo_label = None
-        if team.logo and row_height >= 18:
+        if team.logo:
             try:
                 img = Image.open(team.logo)
                 img.thumbnail((logo_size, logo_size), Image.LANCZOS)
@@ -465,15 +463,15 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         )
         name_label.pack(side="left")
 
-        points_label = self._create_stat_box(
+        points_box, points_label = self._create_stat_box(
             row, 0, 3, str(team.points),
             font_size=stat_font_size, corner_radius=stat_corner, padx=stat_box_padx, pady=stat_box_pady
         )
-        hit_label = self._create_stat_box(
+        hit_box, hit_label = self._create_stat_box(
             row, 0, 4, str(team.cups_hit),
             font_size=stat_font_size, corner_radius=stat_corner, padx=stat_box_padx, pady=stat_box_pady
         )
-        diff_label = self._create_stat_box(
+        diff_box, diff_label = self._create_stat_box(
             row, 0, 5, str(team.total_cups_diff),
             font_size=stat_font_size, corner_radius=stat_corner, padx=stat_box_padx, pady=stat_box_pady
         )
@@ -485,6 +483,9 @@ class TournamentBracketCanvas(ctk.CTkFrame):
             points_label=points_label,
             hit_label=hit_label,
             diff_label=diff_label,
+            points_box=points_box,
+            hit_box=hit_box,
+            diff_box=diff_box,
             logo_label=logo_label,
         )
     
@@ -505,6 +506,37 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         label.pack(expand=True, fill="both", padx=4, pady=2)
 
         return box, label
+    
+    def _update_standings_row_styles(self):
+        self.update_idletasks()
+
+        for row_view in self.standings_rows:
+            row_height = row_view.frame.winfo_height()
+
+            if row_height <= 1:
+                continue
+
+            row_font_size = max(8, min(14, int(row_height * 0.42)))
+            stat_font_size = max(7, min(11, int(row_height * 0.32)))
+            row_corner = max(4, int(row_height * 0.22))
+            stat_corner = max(4, int(row_height * 0.14))
+
+            row_view.frame.configure(corner_radius=row_corner)
+
+            row_view.position_label.configure(font=("Arial", row_font_size))
+            row_view.name_label.configure(font=("Arial", row_font_size))
+            row_view.points_label.configure(font=("Consolas", stat_font_size, "bold"))
+            row_view.hit_label.configure(font=("Consolas", stat_font_size, "bold"))
+            row_view.diff_label.configure(font=("Consolas", stat_font_size, "bold"))
+
+            if row_view.points_box is not None:
+                row_view.points_box.configure(corner_radius=stat_corner)
+
+            if row_view.hit_box is not None:
+                row_view.hit_box.configure(corner_radius=stat_corner)
+
+            if row_view.diff_box is not None:
+                row_view.diff_box.configure(corner_radius=stat_corner)
 
     def build_group_stage_standings(self, parent, standings, matches):
         self.standings_parent = parent
@@ -513,37 +545,26 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         available_height = parent.winfo_height()
         row_count = max(1, len(standings))
 
-        # Toppområde
         title_font_size = max(12, min(20, int(available_height * 0.022)))
         header_font_size = max(8, min(13, int(available_height * 0.013)))
         header_block_height = max(18, int(header_font_size * 1.9))
 
-        # Vertikal spacing
-        outer_padding = 1
-        row_gap = 2
+        # Disse er bare startverdier før vi kjenner faktisk radhøyde
+        estimated_row_height = max(24, int(available_height / max(6, row_count + 2)))
 
-        # Hold høydeberegningen enkel og stabil
-        top_area = 50
-        usable_height = max(60, available_height - top_area)
+        row_font_size = max(8, min(14, int(estimated_row_height * 0.42)))
+        stat_font_size = max(7, min(11, int(estimated_row_height * 0.32)))
 
-        row_height = usable_height // row_count
-        row_height = max(9, min(100, row_height))
-        row_height = row_height
+        row_corner = max(4, int(estimated_row_height * 0.22))
+        stat_corner = max(4, int(estimated_row_height * 0.14))
 
-        # Alt inni radene skaleres fra row_height
-        row_font_size = max(8, min(14, int(row_height * 0.42)))
-        stat_font_size = max(7, min(11, int(row_height * 0.32)))
+        row_inner_pady = max(0, int(estimated_row_height * 0.05))
+        row_inner_padx = max(2, int(estimated_row_height * 0.12))
 
-        row_corner = max(4, int(row_height * 0.22))
-        stat_corner = max(2, int(row_height * 0.14))
+        stat_box_padx = max(1, int(estimated_row_height * 0.05))
+        stat_box_pady = max(2, int(estimated_row_height * 0.12))
 
-        row_inner_pady = max(0, int(row_height * 0.05))
-        row_inner_padx = max(2, int(row_height * 0.12))
-
-        stat_box_padx = max(1, int(row_height * 0.05))
-        stat_box_pady = max(2, int(row_height * 0.12))
-
-        logo_size = max(10, int(row_height * 0.62))
+        logo_size = max(10, int(estimated_row_height * 0.62))
 
         title = ctk.CTkLabel(
             parent,
@@ -557,24 +578,34 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         rows = ctk.CTkFrame(parent, fg_color="transparent")
         rows.pack(fill="both", expand=True, padx=4, pady=0)
 
+        rows.grid_columnconfigure(0, weight=1)
+        for i in range(len(standings)):
+            rows.grid_rowconfigure(i, weight=1)
+
         for idx, team in enumerate(standings, start=1):
             row_view = self._build_standings_row(
                 rows,
                 idx,
                 team,
-                row_gap,
-                row_height,
-                row_corner,
-                row_font_size,
-                row_inner_padx,
-                row_inner_pady,
-                stat_box_padx,
-                stat_box_pady,
-                stat_font_size,
-                stat_corner,
-                logo_size,
+                row_gap=2,
+                row_height=estimated_row_height,
+                row_corner=row_corner,
+                row_font_size=row_font_size,
+                row_inner_padx=row_inner_padx,
+                row_inner_pady=row_inner_pady,
+                stat_box_padx=stat_box_padx,
+                stat_box_pady=stat_box_pady,
+                stat_font_size=stat_font_size,
+                stat_corner=stat_corner,
+                logo_size=logo_size,
             )
+
+            row_view.frame.grid(row=idx - 1, column=0, sticky="nsew", padx=4, pady=2)
+
             self.standings_rows.append(row_view)
+            
+        self.after(10, self._update_standings_row_styles)
+        parent.bind("<Configure>", lambda _e: self.after(10, self._update_standings_row_styles))
             
     def build_group_stage_matches(self, parent, matches):
         available_height = parent.winfo_height()
