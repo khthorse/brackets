@@ -7,15 +7,28 @@ from PIL import Image, ImageTk
 from models import GroupStageModel, Team, TournamentModel
 from team_io import parse_team_file, teams_from_text
 from time_utils import normalize_time_input, is_valid_hhmm
-from translations import t
+from translations import t, set_language
+from display_utils import apply_dark_title_bar
 
 class ControlWindow(ctk.CTkToplevel):
     """
     Kontrollvinduet der du kan legge inn lag, sette vinnere, angi starttidspunkt
     og redigere kampoppsettet.
     """
-    def __init__(self, master, tournament_state, bracket_canvas, timers=None, settings=None, *args, **kwargs):
+    def __init__(
+        self,
+        master,
+        tournament_state,
+        bracket_canvas,
+        timers=None,
+        settings=None,
+        toggle_fullscreen_callback=None,
+        language_changed_callback=None,
+        *args,
+        **kwargs
+    ):
         super().__init__(master, *args, **kwargs)
+        self.language_changed_callback = language_changed_callback
         self.tournament_state = tournament_state
         self.tournament_model = tournament_state.bracket_model
         self.bracket_canvas = bracket_canvas
@@ -23,16 +36,17 @@ class ControlWindow(ctk.CTkToplevel):
         self.group_stage_model = tournament_state.group_stage_model
 
         self.title(t("control_window_title"))
-        self.geometry("900x1080")
         self.timers = timers or []
+        self.toggle_fullscreen_callback = toggle_fullscreen_callback
 
         self.setup_panel = ctk.CTkFrame(self)
         self.setup_panel.pack(fill="x", padx=10, pady=10)
 
-        ctk.CTkLabel(self.setup_panel, text=t("setup_section"), font=("Arial", 20)).pack(pady=6)
+        self.setup_title_label = ctk.CTkLabel(self.setup_panel, text=t("setup_section"), font=("Arial", 20))
+        self.setup_title_label.pack(pady=6)
 
-        team_entry_label = ctk.CTkLabel(self.setup_panel, text=t("enter_teams_one_per_line"))
-        team_entry_label.pack(pady=5)
+        self.team_entry_label = ctk.CTkLabel(self.setup_panel, text=t("enter_teams_one_per_line"))
+        self.team_entry_label.pack(pady=5)
 
         self.team_text = tk.Text(self.setup_panel, height=12, width=60)
         self.team_text.pack(pady=5)
@@ -45,12 +59,12 @@ class ControlWindow(ctk.CTkToplevel):
         setup_button_row = ctk.CTkFrame(self.setup_panel)
         setup_button_row.pack(fill="x", padx=10, pady=8)
 
-        load_from_file_btn = ctk.CTkButton(
+        self.load_from_file_btn = ctk.CTkButton(
             setup_button_row,
             text=t("load_teams_from_file"),
             command=self.load_teams_from_file
         )
-        load_from_file_btn.pack(side="left", padx=6, pady=4)
+        self.load_from_file_btn.pack(side="left", padx=6, pady=4)
 
         self.logo_switch = settings.ask_for_logos if settings is not None else False
         self.load_logo_checkbox = ctk.CTkCheckBox(
@@ -72,10 +86,41 @@ class ControlWindow(ctk.CTkToplevel):
         )
         self.reset_all_button.pack(side="right", padx=6, pady=4)
 
+        self.display_panel = ctk.CTkFrame(self)
+        self.display_panel.pack(fill="x", padx=10, pady=10)
+
+        self.display_title_label = ctk.CTkLabel(self.display_panel, text=t("display_section"), font=("Arial", 20))
+        self.display_title_label.pack(pady=6)
+
+        display_button_row = ctk.CTkFrame(self.display_panel)
+        display_button_row.pack(fill="x", padx=10, pady=8)
+
+        self.fullscreen_button = ctk.CTkButton(
+            display_button_row,
+            text="",
+            command=self.toggle_fullscreen_mode
+        )
+        self.fullscreen_button.pack(side="left", padx=6, pady=4)
+
+        self.language_label = ctk.CTkLabel(
+            display_button_row,
+            text=t("language_label")
+        )
+        self.language_label.pack(side="left", padx=(18, 6), pady=4)
+
+        self.language_menu = ctk.CTkOptionMenu(
+            display_button_row,
+            values=[],
+            command=self.on_language_selected,
+            width=140,
+        )
+        self.language_menu.pack(side="left", padx=6, pady=4)
+
         self.flow_panel = ctk.CTkFrame(self)
         self.flow_panel.pack(fill="x", padx=10, pady=10)
 
-        ctk.CTkLabel(self.flow_panel, text=t("tournament_flow"), font=("Arial", 20)).pack(pady=6)
+        self.flow_title_label = ctk.CTkLabel(self.flow_panel, text=t("tournament_flow"), font=("Arial", 20))
+        self.flow_title_label.pack(pady=6)
 
         flow_button_row = ctk.CTkFrame(self.flow_panel)
         flow_button_row.pack(fill="x", padx=10, pady=8)
@@ -118,41 +163,69 @@ class ControlWindow(ctk.CTkToplevel):
             command=self.confirm_restart_tournament
         )
 
-        self._build_timer_controls()
+        self.timer_controls_host = ctk.CTkFrame(self, fg_color="transparent")
+        self.timer_controls_host.pack(fill="x", padx=0, pady=0)
 
         self.match_controls_frame = ctk.CTkScrollableFrame(self)
         self.match_controls_frame.pack(fill="both", expand=True, pady=10)
 
+        self._build_timer_controls()
+
         self.draw_match_controls()
         self.teams = []
         self.update_ui_for_phase()
+        self.update_fullscreen_button_text()
+        self.update_language_menu()
 
     def _build_timer_controls(self):
         if not self.timers:
             return
 
-        timer_section = ctk.CTkFrame(self)
-        timer_section.pack(fill="x", padx=10, pady=10)
+        if not hasattr(self, "timer_controls_host") or not self.timer_controls_host.winfo_exists():
+            return
 
-        ctk.CTkLabel(timer_section, text=t("timer_controls"), font=("Arial", 20)).pack(pady=6)
+        for child in self.timer_controls_host.winfo_children():
+            child.destroy()
+
+        self.timer_row_labels = []
+
+        self.timer_section = ctk.CTkFrame(self.timer_controls_host)
+        self.timer_section.pack(fill="x", padx=10, pady=10)
+
+        self.timer_section_title = ctk.CTkLabel(
+            self.timer_section,
+            text=t("timer_controls"),
+            font=("Arial", 20)
+        )
+        self.timer_section_title.pack(pady=6)
+
+        self.start_all_timers_button = ctk.CTkButton(
+            self.timer_section,
+            text=t("start_all_timers"),
+            command=self.toggle_all_timers,
+        )
+        self.start_all_timers_button.pack(pady=(0, 8))
+        self.update_start_all_button_text()
 
         for i, timer in enumerate(self.timers, start=1):
-            row = ctk.CTkFrame(timer_section)
+            row = ctk.CTkFrame(self.timer_section)
             row.pack(fill="x", padx=6, pady=4)
 
-            ctk.CTkLabel(row, text=t("table_label").format(index=i)).pack(side="left", padx=8)
+            row_label = ctk.CTkLabel(row, text=t("table_label").format(index=i))
+            row_label.pack(side="left", padx=8)
+            self.timer_row_labels.append((row_label, i))
 
             time_frame = ctk.CTkFrame(
-                    row,
-                    fg_color="#1f1f1f",   # mørkere bakgrunn
-                    corner_radius=8
-                )
+                row,
+                fg_color="#1f1f1f",
+                corner_radius=8
+            )
             time_frame.pack(side="left", padx=8, pady=2)
 
             time_label = ctk.CTkLabel(
                 time_frame,
                 text="00:00",
-                font=("Consolas", 22)  # monospace + større
+                font=("Consolas", 22)
             )
             time_label.pack(padx=10, pady=4)
 
@@ -166,17 +239,19 @@ class ControlWindow(ctk.CTkToplevel):
             )
             primary_button.pack(side="right", padx=4)
 
-            ctk.CTkButton(
+            reset_button = ctk.CTkButton(
                 row,
                 text=t("reset"),
                 command=lambda t=timer: t.reset_timer()
-            ).pack(side="right", padx=4)
+            )
+            reset_button.pack(side="right", padx=4)
 
-            ctk.CTkButton(
+            change_time_button = ctk.CTkButton(
                 row,
                 text=t("change_time"),
                 command=lambda t=timer: self.change_timer_time(t)
-            ).pack(side="right", padx=4)
+            )
+            change_time_button.pack(side="right", padx=4)
 
             mute_button = ctk.CTkButton(
                 row,
@@ -185,19 +260,155 @@ class ControlWindow(ctk.CTkToplevel):
             )
             mute_button.pack(side="right", padx=4)
 
-            def update_timer_info(t=timer, tl=time_label, sl=status_label, pb=primary_button, mb=mute_button):
-                if not (tl.winfo_exists() and sl.winfo_exists() and pb.winfo_exists()):
+            def update_timer_info(
+                ti=timer,
+                tl=time_label,
+                sl=status_label,
+                pb=primary_button,
+                rb=reset_button,
+                cb=change_time_button,
+                mb=mute_button
+            ):
+                if not (
+                    tl.winfo_exists()
+                    and sl.winfo_exists()
+                    and pb.winfo_exists()
+                    and rb.winfo_exists()
+                    and cb.winfo_exists()
+                    and mb.winfo_exists()
+                ):
                     return
 
                 tl.configure(
-                    text=t.get_display_time(),
-                    text_color=(t.get_time_color(), t.get_time_color())
+                    text=ti.get_display_time(),
+                    text_color=(ti.get_time_color(), ti.get_time_color())
                 )
-                sl.configure(text=t.get_status_text())
-                pb.configure(text=t.get_primary_button_text())
-                mb.configure(text=t.get_mute_text())
+                sl.configure(text=ti.get_status_text())
+                pb.configure(text=ti.get_primary_button_text())
+                rb.configure(text=t("reset"))
+                cb.configure(text=t("change_time"))
+                mb.configure(text=ti.get_mute_text())
+
+                self.update_start_all_button_text()
+
             timer.add_observer(update_timer_info)
             update_timer_info()
+
+    def any_timer_running(self):
+        for timer in self.timers:
+            if timer.timer_id is not None and not timer.paused:
+                return True
+        return False
+    
+    def update_start_all_button_text(self):
+        if not hasattr(self, "start_all_timers_button"):
+            return
+
+        if self.any_timer_running():
+            self.start_all_timers_button.configure(text=t("pause_all_timers"))
+        else:
+            self.start_all_timers_button.configure(text=t("start_all_timers"))
+
+    def toggle_all_timers(self):
+        if self.any_timer_running():
+            # Pause alle
+            for timer in self.timers:
+                if timer.timer_id is not None and not timer.paused:
+                    timer.toggle_pause()
+        else:
+            # Start / resume alle
+            for timer in self.timers:
+                if timer.current_time < 0:
+                    timer.reset_timer()
+
+                if timer.paused:
+                    timer.toggle_pause()
+                elif timer.timer_id is None:
+                    timer.countdown()
+
+        self.update_start_all_button_text()
+
+    def _refresh_timer_section_texts(self):
+        if hasattr(self, "timer_section_title") and self.timer_section_title.winfo_exists():
+            self.timer_section_title.configure(text=t("timer_controls"))
+
+        if hasattr(self, "timer_row_labels"):
+            for row_label, index in self.timer_row_labels:
+                if row_label.winfo_exists():
+                    row_label.configure(text=t("table_label").format(index=index))
+
+        for timer in self.timers:
+            timer.refresh_texts()
+
+    def update_fullscreen_button_text(self):
+        if self.settings.fullscreen_enabled:
+            self.fullscreen_button.configure(text=t("windowed"))
+        else:
+            self.fullscreen_button.configure(text=t("fullscreen"))
+
+    def get_language_options(self):
+        return {
+            t("language_no"): "no",
+            t("language_en"): "en",
+        }
+
+
+    def update_language_menu(self):
+        options = self.get_language_options()
+        labels = list(options.keys())
+
+        self.language_menu.configure(values=labels)
+
+        current_label = next(
+            (label for label, code in options.items() if code == self.settings.language),
+            labels[0],
+        )
+        self.language_menu.set(current_label)
+
+        self.language_label.configure(text=t("language_label"))
+
+
+    def on_language_selected(self, selected_label: str):
+        options = self.get_language_options()
+        new_lang = options.get(selected_label, self.settings.language)
+
+        if new_lang == self.settings.language:
+            return
+
+        self.settings.language = new_lang
+        set_language(self.settings.language)
+
+        if self.language_changed_callback is not None:
+            self.language_changed_callback()
+        else:
+            self.refresh_texts()
+
+
+    def toggle_fullscreen_mode(self):
+        if self.toggle_fullscreen_callback is not None:
+            self.toggle_fullscreen_callback()
+
+    def refresh_texts(self):
+        self.title(t("control_window_title"))
+
+        self.setup_title_label.configure(text=t("setup_section"))
+        self.team_entry_label.configure(text=t("enter_teams_one_per_line"))
+        self.display_title_label.configure(text=t("display_section"))
+        self.flow_title_label.configure(text=t("tournament_flow"))
+
+        self.load_from_file_btn.configure(text=t("load_teams_from_file"))
+        self.load_logo_checkbox.configure(text=t("add_team_logos"))
+        self.reset_all_button.configure(text=t("reset_all"))
+
+        self.back_to_group_button.configure(text=t("back_to_group_stage"))
+        self.back_to_setup_button.configure(text=t("back_to_setup"))
+        self.restart_button.configure(text=t("restart_tournament"))
+
+        self.update_flow_button_texts()
+        self.update_fullscreen_button_text()
+        self.update_language_menu()
+        self._build_timer_controls()
+        self._reset_match_controls_view()
 
     def change_timer_time(self, timer):
         top = self._make_dialog(t("change_time_title"), width=360, height=220)
@@ -248,7 +459,7 @@ class ControlWindow(ctk.CTkToplevel):
 
         top.wait_visibility()
 
-        self._set_dark_title_bar(top)
+        top.after(50, lambda: apply_dark_title_bar(top))
 
         top.attributes("-topmost", True)
         top.lift(self)
@@ -263,23 +474,6 @@ class ControlWindow(ctk.CTkToplevel):
         ctk.CTkLabel(top, text=message, justify="center").pack(padx=20, pady=20)
         ctk.CTkButton(top, text=t("ok"), command=top.destroy).pack(pady=(0, 12))
     
-    def _set_dark_title_bar(self, window):
-        try:
-            import ctypes
-
-            hwnd = ctypes.windll.user32.GetParent(window.winfo_id())
-            value = ctypes.c_int(1)
-
-            # Windows 11 / nyere Windows 10
-            DWMWA_USE_IMMERSIVE_DARK_MODE = 20
-            ctypes.windll.dwmapi.DwmSetWindowAttribute(
-                hwnd,
-                DWMWA_USE_IMMERSIVE_DARK_MODE,
-                ctypes.byref(value),
-                ctypes.sizeof(value)
-            )
-        except Exception:
-            pass
 
     def _show_setup_panel(self):
         if not self.setup_panel.winfo_manager():
@@ -290,8 +484,27 @@ class ControlWindow(ctk.CTkToplevel):
         if self.setup_panel.winfo_manager():
             self.setup_panel.pack_forget()
 
+    def update_flow_button_texts(self):
+        has_group_stage = self.tournament_state.group_stage_model is not None
+        has_bracket = (
+            self.tournament_state.bracket_model is not None
+            and len(self.tournament_state.bracket_model.get_rounds()) > 0
+        )
+
+        self.build_bracket_button.configure(
+            text=t("continue_bracket") if has_bracket else t("build_bracket")
+        )
+
+        self.start_group_button.configure(
+            text=t("continue_group_stage") if has_group_stage else t("start_group_stage")
+        )
+
+        self.start_bracket_button.configure(
+            text=t("continue_playoffs") if has_bracket else t("start_playoffs")
+        )
 
     def update_ui_for_phase(self):
+        self.update_flow_button_texts()
         phase = self.tournament_state.phase
 
         self.start_bracket_button.pack_forget()
@@ -634,13 +847,6 @@ class ControlWindow(ctk.CTkToplevel):
                 btn_t1.configure(state="disabled")
                 btn_t2.configure(state="disabled")
                 btn_time.configure(state="disabled")
-
-        update_standings_btn = ctk.CTkButton(
-            self.match_controls_frame,
-            text=t("update_standings"),
-            command=lambda: self.bracket_canvas.show_group_stage(self.group_stage_model)
-        )
-        update_standings_btn.pack(pady=10)
 
     def edit_group_result(self, match_index):
         match = self.group_stage_model.matches[match_index]

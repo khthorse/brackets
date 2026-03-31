@@ -27,6 +27,12 @@ LANGUAGES = {
         "start_group_stage": "Start Gruppespill",
         "start_playoffs": "Start Sluttspill",
 
+        "display_section": "Visning",
+        "display_section": "Visning",
+        "language_label": "Språk",
+        "language_no": "Norsk",
+        "language_en": "English",
+
         "timer_controls": "Timerkontroll",
         "table_label": "Bord {index}",
         "reset": "Reset",
@@ -34,6 +40,16 @@ LANGUAGES = {
         "save": "Lagre",
         "cancel": "Avbryt",
         "ok": "OK",
+        "finished": "Ferdig!",
+        "running": "Kjører",
+        "ready": "Klar",
+        "pause": "Pause",
+        "resume": "Fortsett",
+        "start": "Start",
+        "mute_on": "🔇 Lyd av",
+        "mute_off": "🔊 Lyd på",
+        "start_all_timers": "Start alle timere",
+        "pause_all_timers": "Pause alle timere",
 
         "change_time_title": "Endre tid",
         "enter_new_time_mmss": "Skriv inn ny tid (MM:SS):",
@@ -85,15 +101,6 @@ LANGUAGES = {
         "team_1": "Lag 1:",
         "team_2": "Lag 2:",
 
-        "finished": "Ferdig!",
-        "running": "Kjører",
-        "ready": "Klar",
-        "pause": "Pause",
-        "resume": "Fortsett",
-        "start": "Start",
-        "mute_on": "🔇 Lyd av",
-        "mute_off": "🔊 Lyd på",
-
         "invalid_mmss_time": "Ugyldig tid. Bruk MM:SS.",
 
         "spring": "Vår",
@@ -122,6 +129,9 @@ LANGUAGES = {
         "confirm_reset_message": "Vil du nullstille hele turneringen? Dette sletter alle lag, resultater og oppsett.",
         "yes": "Ja",
         "no": "Nei",
+
+        "fullscreen": "Fullskjerm",
+        "windowed": "Vindu",
     },
 
     "en": {
@@ -151,6 +161,12 @@ LANGUAGES = {
         "start_group_stage": "Start Group Stage",
         "start_playoffs": "Start Playoffs",
 
+        "display_section": "Display",
+        "display_section": "Display",
+        "language_label": "Language",
+        "language_no": "Norsk",
+        "language_en": "English",
+
         "timer_controls": "Timer Controls",
         "table_label": "Table {index}",
         "reset": "Reset",
@@ -158,6 +174,16 @@ LANGUAGES = {
         "save": "Save",
         "cancel": "Cancel",
         "ok": "OK",
+        "finished": "Finished!",
+        "running": "Running",
+        "ready": "Ready",
+        "pause": "Pause",
+        "resume": "Resume",
+        "start": "Start",
+        "mute_on": "🔇 Muted",
+        "mute_off": "🔊 Sound On",
+        "start_all_timers": "Start All Timers",
+        "pause_all_timers": "Pause All Timers",
 
         "change_time_title": "Change Time",
         "enter_new_time_mmss": "Enter new time (MM:SS):",
@@ -209,15 +235,6 @@ LANGUAGES = {
         "team_1": "Team 1:",
         "team_2": "Team 2:",
 
-        "finished": "Finished!",
-        "running": "Running",
-        "ready": "Ready",
-        "pause": "Pause",
-        "resume": "Resume",
-        "start": "Start",
-        "mute_on": "🔇 Muted",
-        "mute_off": "🔊 Sound On",
-
         "invalid_mmss_time": "Invalid time. Use MM:SS.",
 
         "spring": "Spring",
@@ -246,6 +263,8 @@ LANGUAGES = {
         "confirm_reset_message": "Do you want to reset the entire tournament? This deletes all teams, results, and setup.",
         "yes": "Yes",
         "no": "No",
+        "fullscreen": "Fullscreen",
+        "windowed": "Windowed",
     }
 }
 

@@ -15,7 +15,19 @@ except ImportError:
     winsound = None
 
 class Timer:
-    def __init__(self, master, initial_time, timer_label, show_controls=True, settings=None, scale=1.0):
+    def __init__(
+        self,
+        master,
+        initial_time,
+        timer_label,
+        show_controls=True,
+        settings=None,
+        scale=1.0,
+        timer_index=None,
+        use_table_label=False,
+    ):
+        self.timer_index = timer_index
+        self.use_table_label = use_table_label
         self.master = master
         self.settings = settings
         self.scale = scale
@@ -45,7 +57,11 @@ class Timer:
         title_pad_y = max(4, int(10 * self.scale))
         title_pad_x = max(2, int(5 * self.scale))
 
-        self._timer_label = ctk.CTkLabel(self.frame, text=timer_label, font=("Helvetica", title_font_size))
+        self._timer_label = ctk.CTkLabel(
+            self.frame,
+            text=self.get_timer_title_text(),
+            font=("Helvetica", title_font_size)
+        )
         self._timer_label.pack(pady=title_pad_y, padx=title_pad_x)
 
         self.canvas_size = max(120, int(250 * self.scale))
@@ -174,6 +190,32 @@ class Timer:
 
     def add_observer(self, callback):
         self._observers.append(callback)
+    
+    def get_timer_title_text(self) -> str:
+        if self.use_table_label and self.timer_index is not None:
+            return t("table_label").format(index=self.timer_index)
+        return t("countdown_timer")
+
+    def refresh_texts(self):
+        if hasattr(self, "_timer_label") and self._timer_label.winfo_exists():
+            self._timer_label.configure(text=self.get_timer_title_text())
+
+        if hasattr(self, "start_button"):
+            self.start_button.configure(text=t("start"))
+
+        if hasattr(self, "pause_button"):
+            if self.paused:
+                self.pause_button.configure(text=t("resume"))
+            else:
+                self.pause_button.configure(text=t("pause"))
+
+        if hasattr(self, "reset_button"):
+            self.reset_button.configure(text=t("reset"))
+
+        if hasattr(self, "change_time_button"):
+            self.change_time_button.configure(text=t("change_time"))
+
+        self._notify_observers()
 
     def _notify_observers(self):
         alive_callbacks = []

@@ -239,3 +239,20 @@ def apply_control_window_on_monitor(
         top_offset=0,
     )
     window.geometry(f"{width}x{height}+{x}+{y}")
+
+def apply_dark_title_bar(window):
+    try:
+        window.update_idletasks()
+
+        hwnd = ctypes.windll.user32.GetParent(window.winfo_id())
+        value = ctypes.c_int(1)
+
+        DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_USE_IMMERSIVE_DARK_MODE,
+            ctypes.byref(value),
+            ctypes.sizeof(value),
+        )
+    except Exception:
+        pass

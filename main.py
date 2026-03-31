@@ -17,6 +17,7 @@ from display_utils import (
     apply_borderless_fullscreen,
     apply_main_windowed_on_monitor,
     apply_control_window_on_monitor,
+    apply_dark_title_bar,
 )
 
 def on_resize(event):
@@ -57,6 +58,21 @@ def get_title_font_size(screen_height: int) -> int:
     scale = max(0.8, min(1.8, scale))
 
     return int(base * scale)
+
+def apply_root_window_mode():
+    if settings.fullscreen_enabled:
+        apply_borderless_fullscreen(root, monitor)
+    else:
+        apply_main_windowed_on_monitor(root, monitor)
+        apply_dark_title_bar(root)
+
+
+def toggle_root_fullscreen():
+    settings.fullscreen_enabled = not settings.fullscreen_enabled
+    apply_root_window_mode()
+
+    if "control_window" in globals():
+        control_window.update_fullscreen_button_text()
 
 def find_time():
     year = str(time.localtime().tm_year)
@@ -109,10 +125,26 @@ def build_timers(timer_frame, settings, screen_height):
             show_controls=False,
             settings=settings,
             scale=scale,
+            timer_index=i + 1 if timer_count > 1 else None,
+            use_table_label=(timer_count > 1),
         )
         timers.append(timer)
 
     return timers
+
+def refresh_language_ui():
+    app_state.title = get_tournament_title(settings)
+    root.title(app_state.title)
+
+    brackets_label.configure(text=app_state.title)
+    timer_label.configure(text=t("countdown_timer"))
+
+    for timer in timers:
+        timer.refresh_texts()
+
+    bracket_frame.refresh_language()
+
+    control_window.refresh_texts()
 
 ctk.set_appearance_mode('dark')
 #ctk.set_default_color_theme('green')
@@ -130,10 +162,7 @@ monitor = get_monitor_by_index(settings.fullscreen_monitor_index)
 root = ctk.CTk()
 root.title(app_state.title)
 
-if settings.fullscreen_enabled:
-    apply_borderless_fullscreen(root, monitor)
-else:
-    apply_main_windowed_on_monitor(root, monitor)
+apply_root_window_mode()
 
 #configure grid
 root.columnconfigure(0, weight=0)
@@ -205,6 +234,8 @@ control_window = ControlWindow(
     bracket_canvas=bracket_frame,
     timers=timers,
     settings=settings,
+    toggle_fullscreen_callback=toggle_root_fullscreen,
+    language_changed_callback=refresh_language_ui,
 )
 
 control_monitor = get_secondary_monitor(settings.fullscreen_monitor_index)

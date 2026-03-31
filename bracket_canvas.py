@@ -61,6 +61,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
                 print(f"Error when loading logo: {e}")
 
     def show_group_stage(self, group_stage_model):
+        self.group_stage_model = group_stage_model
         self.canvas.delete("all")
         self.images.clear()
 
@@ -444,6 +445,12 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         last_round = rounds[-1]
         if len(last_round) == 1 and last_round[0].winner:
             self.show_winner_popup(last_round[0].winner)
+
+    def refresh_language(self):
+        if hasattr(self, "group_stage_model") and self.group_stage_model is not None:
+            self.show_group_stage(self.group_stage_model)
+        else:
+            self.refresh()
 
     def refresh(self):
         self.draw_bracket()
