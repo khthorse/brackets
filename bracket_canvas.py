@@ -1,9 +1,21 @@
 import customtkinter as ctk
 import tkinter as tk
 
+from dataclasses import dataclass
+from typing import Optional
 from PIL import Image, ImageTk
 
 from translations import t
+
+@dataclass
+class StandingsRowView:
+    frame: ctk.CTkFrame
+    position_label: ctk.CTkLabel
+    name_label: ctk.CTkLabel
+    points_label: ctk.CTkLabel
+    hit_label: ctk.CTkLabel
+    diff_label: ctk.CTkLabel
+    logo_label: Optional[tk.Label] = None
 
 class TournamentBracketCanvas(ctk.CTkFrame):
     """
@@ -26,6 +38,9 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         self._group_stage_frames = None
         self.previous_standings_positions = {}
 
+        self.standings_rows = []
+        self.standings_layout = None
+
         self.bracket_view = ctk.CTkFrame(self, fg_color="#2b2b2b")
         self.bracket_view.pack(fill="both", expand=True)
 
@@ -36,19 +51,26 @@ class TournamentBracketCanvas(ctk.CTkFrame):
 
         self.group_stage_view = ctk.CTkFrame(self, fg_color="#2b2b2b")
 
-    def _create_stat_box(self, parent, row, column, value, row_height):
+    def _create_stat_box(self, parent, row, column, value, box_height, font_size, corner_radius, padx, pady):
+        box_width = max(22, min(40, int(box_height * 2.0)))
+
         box = ctk.CTkFrame(
             parent,
             fg_color="#1f1f1f",
-            corner_radius=max(6, int(row_height * 0.18))
+            corner_radius=corner_radius,
+            width=box_width,
+            height=box_height,
         )
-        box.grid(row=row, column=column, padx=4, pady=2, sticky="nsew")
+        box.grid(row=row, column=column, padx=2, pady=1)
+        box.grid_propagate(False)
 
-        ctk.CTkLabel(
+        label = ctk.CTkLabel(
             box,
             text=value,
-            font=("Consolas", max(9, int(row_height * 0.28)), "bold"),
-        ).pack(padx=8, pady=3)
+            font=("Consolas", font_size, "bold"),
+        )
+        label.place(relx=0.5, rely=0.5, anchor="center")
+        return label
 
     def get_position_trend(self, team_name, current_position):
         previous_position = self.previous_standings_positions.get(team_name)
@@ -178,6 +200,8 @@ class TournamentBracketCanvas(ctk.CTkFrame):
                 self.images.append(logo_img)
             except Exception as e:
                 print(f"Error when loading logo: {e}")
+    ''' 
+        Deprecated
 
     def draw_standings_table(self, x, y, width, row_height, standings, scale):
         headers = ["#", t("team_label"), t("points_short"), t("hit_short"), t("diff_short")]
@@ -251,6 +275,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
                     font=cell_font,
                     anchor=anchor,
                 )
+    '''
 
     def _schedule_group_stage_rebuild(self, delay=30):
         if self._group_stage_rebuild_job is not None:
@@ -303,13 +328,6 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         for child in self.group_stage_view.winfo_children():
             child.destroy()
 
-        title = ctk.CTkLabel(
-            self.group_stage_view,
-            text=t("group_stage"),
-            font=("Arial", 28, "bold"),
-        )
-        title.pack(pady=(6, 4))
-
         content = ctk.CTkFrame(self.group_stage_view, fg_color="transparent")
         content.pack(fill="both", expand=True, padx=20, pady=(0, 20))
 
@@ -336,43 +354,106 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         matches_frame.bind("<Configure>", lambda _e: self._schedule_group_stage_rebuild(delay=60))
 
     def build_group_stage_standings(self, parent, standings, matches):
+        available_height = parent.winfo_height()
+
+        #available_height = 2000
+
+        row_count = max(1, len(standings))
+
+        # Skaler toppområdet direkte fra tilgjengelig høyde
+        title_font_size = max(12, min(20, int(available_height * 0.022)))
+        header_font_size = max(8, min(13, int(available_height * 0.013)))
+
+        title_block_height = max(22, int(title_font_size * 1.5))
+        header_block_height = max(18, int(header_font_size * 1.9))
+
+        outer_padding = 1
+        row_gap = 2
+
+        reserved_height = (
+            title_block_height
+            + header_block_height
+            + outer_padding * 2
+            + row_count * (row_gap * 2)
+        )
+        print("Standings")
+        print("available_height:", available_height)
+        print("title_block_height:", title_block_height)
+        print("header_block_height:", header_block_height)
+        print("reserved_height:", reserved_height)
+        print("usable_height:", max(60, available_height - reserved_height))
+        print("row_count: ", row_count)
+
+                
+        usable_height = max(60, available_height - reserved_height)
+        row_height = usable_height // row_count
+        print("row height: ", row_height)
+        row_height = max(12, min(100, row_height))
+
+        print("row height: ", row_height)
+
+        # Alt inni radene skaleres fra row_height
+        row_font_size = max(8, min(14, int(row_height * 0.42)))
+        stat_font_size = max(7, min(11, int(row_height * 0.32)))
+
+        row_corner = max(4, int(row_height * 0.22))
+        stat_corner = max(3, min(8, int(row_height * 0.14)))
+
+        row_inner_pady = max(0, int(row_height * 0.05))
+        row_inner_padx = max(2, int(row_height * 0.12))
+
+        stat_box_height = max(10, min(18, int(row_height * 0.46)))
+        stat_box_padx = 0
+        stat_box_pady = 0
+
+        logo_size = max(10, int(row_height * 0.62))
+        # Fast overhead, men stramt
+        title_font_size = max(12, min(18, int(row_height * 0.75)))
+        header_font_size = max(8, min(12, int(row_height * 0.42)))
+        title_block_height = max(20, int(title_font_size * 1.4))
+        header_block_height = max(18, int(header_font_size * 1.8))
+
+
+        # Alt annet skaleres fra row_height
+        row_font_size = max(8, min(14, int(row_height * 0.42)))
+        stat_font_size = max(7, min(11, int(row_height * 0.32)))
+
+        row_corner = max(4, int(row_height * 0.22))
+        stat_corner = max(3, min(8, int(row_height * 0.14)))
+
+        row_inner_pady = max(0, int(row_height * 0.08))
+        row_inner_padx = max(3, int(row_height * 0.18))
+
+        stat_box_height = max(10, min(20, int(row_height * 0.50)))
+        stat_box_padx = 0
+        stat_box_pady = 0
+
+        logo_size = max(10, int(row_height * 0.62))
+
         title = ctk.CTkLabel(
             parent,
             text=t("standings"),
-            font=("Arial", 22, "bold"),
+            font=("Arial", title_font_size, "bold"),
         )
-        title.pack(pady=(5, 6))
-        
-        available_height = parent.winfo_height()
-        available_width = parent.winfo_width()
+        title.pack(pady=(2, 2))
 
-        title_height = 42
-        header_height = 30
-        top_bottom_padding = 6
-
-        row_count = max(1, len(standings))
-        usable_height = available_height - title_height - header_height - top_bottom_padding
-        row_height = int(usable_height / row_count)
-        row_height = max(14, row_height)
-
-        header = ctk.CTkFrame(parent, fg_color="transparent", height=header_height)
-        header.pack(fill="x", padx=8, pady=(0, 6))
+        header = ctk.CTkFrame(parent, fg_color="transparent", height=header_block_height)
+        header.pack(fill="x", padx=6, pady=(0, 2))
         header.pack_propagate(False)
 
-        header.grid_columnconfigure(0, weight=1)
-        header.grid_columnconfigure(1, weight=1)
-        header.grid_columnconfigure(2, weight=5)
-        header.grid_columnconfigure(3, weight=1)
-        header.grid_columnconfigure(4, weight=1)
-        header.grid_columnconfigure(5, weight=1)
+        header.grid_columnconfigure(0, weight=1, minsize=26)
+        header.grid_columnconfigure(1, weight=1, minsize=34)
+        header.grid_columnconfigure(2, weight=6)             
+        header.grid_columnconfigure(3, weight=1, minsize=34)
+        header.grid_columnconfigure(4, weight=1, minsize=34)
+        header.grid_columnconfigure(5, weight=1, minsize=34)
 
-        ctk.CTkLabel(header, text="", font=("Arial", 14, "bold")).grid(row=0, column=0, padx=4, pady=2)
-        ctk.CTkLabel(header, text="#", font=("Arial", 14, "bold")).grid(row=0, column=1, padx=4, pady=2)
-        ctk.CTkLabel(header, text=t("team_label"), font=("Arial", 14, "bold")).grid(row=0, column=2, padx=6, pady=2, sticky="w")
-        ctk.CTkLabel(header, text=t("points_short"), font=("Arial", 14, "bold")).grid(row=0, column=3, padx=4, pady=2)
-        ctk.CTkLabel(header, text=t("hit_short"), font=("Arial", 14, "bold")).grid(row=0, column=4, padx=4, pady=2)
-        ctk.CTkLabel(header, text=t("diff_short"), font=("Arial", 14, "bold")).grid(row=0, column=5, padx=4, pady=2)
-
+        ctk.CTkLabel(header, text="", font=("Arial", header_font_size, "bold")).grid(row=0, column=0, padx=3, pady=1)
+        ctk.CTkLabel(header, text="#", font=("Arial", header_font_size, "bold")).grid(row=0, column=1, padx=3, pady=1)
+        ctk.CTkLabel(header, text=t("team_label"), font=("Arial", header_font_size, "bold")).grid(row=0, column=2, padx=4, pady=1, sticky="w")
+        ctk.CTkLabel(header, text=t("points_label"), font=("Arial", header_font_size, "bold")).grid(row=0, column=3, padx=2, pady=1)
+        ctk.CTkLabel(header, text=t("hit_label"), font=("Arial", header_font_size, "bold")).grid(row=0, column=4, padx=2, pady=1)
+        ctk.CTkLabel(header, text=t("diff_label"), font=("Arial", header_font_size, "bold")).grid(row=0, column=5, padx=2, pady=1)
         rows = ctk.CTkFrame(parent, fg_color="transparent")
         rows.pack(fill="both", expand=True, padx=4, pady=0)
 
@@ -383,80 +464,95 @@ class TournamentBracketCanvas(ctk.CTkFrame):
             row = ctk.CTkFrame(
                 rows,
                 fg_color=row_color,
-                corner_radius=10,
+                corner_radius=row_corner,
                 height=row_height,
             )
-            row.pack(fill="x", padx=6, pady=2, expand=True)
+            row.pack(fill="x", padx=4, pady=row_gap)
             row.pack_propagate(False)
 
-            row.grid_columnconfigure(0, weight=1)
-            row.grid_columnconfigure(1, weight=1)
-            row.grid_columnconfigure(2, weight=5)
-            row.grid_columnconfigure(3, weight=1)
-            row.grid_columnconfigure(4, weight=1)
-            row.grid_columnconfigure(5, weight=1)
+            row.grid_columnconfigure(0, weight=1, minsize=26)
+            row.grid_columnconfigure(1, weight=1, minsize=34)
+            row.grid_columnconfigure(2, weight=6)
+            row.grid_columnconfigure(3, weight=1, minsize=34)
+            row.grid_columnconfigure(4, weight=1, minsize=34)
+            row.grid_columnconfigure(5, weight=1, minsize=34)
 
             ctk.CTkLabel(
                 row,
                 text="",
-                font=("Arial", 12),
-            ).grid(row=0, column=0, padx=4, pady=2)
+                font=("Arial", row_font_size),
+            ).grid(row=0, column=0, padx=row_inner_padx, pady=row_inner_pady)
 
             ctk.CTkLabel(
                 row,
                 text=str(idx),
-                font=("Arial", 12),
-            ).grid(row=0, column=1, padx=4, pady=2)
+                font=("Arial", row_font_size),
+            ).grid(row=0, column=1, padx=row_inner_padx, pady=row_inner_pady)
+
+            name_wrap = ctk.CTkFrame(row, fg_color="transparent")
+            name_wrap.grid(row=0, column=2, padx=row_inner_padx, pady=row_inner_pady, sticky="w")
+
+            if team.logo and row_height >= 18:
+                try:
+                    img = Image.open(team.logo)
+                    img.thumbnail((logo_size, logo_size), Image.LANCZOS)
+                    logo_img = ImageTk.PhotoImage(img)
+                    self.images.append(logo_img)
+
+                    logo_label = tk.Label(name_wrap, image=logo_img, bg=row_color, bd=0, highlightthickness=0)
+                    logo_label.pack(side="left", padx=(0, 4))
+                except Exception as e:
+                    print(f"Error loading logo: {e}")
 
             ctk.CTkLabel(
-                row,
+                name_wrap,
                 text=team.name,
-                font=("Arial", 12),
-            ).grid(row=0, column=2, padx=6, pady=2, sticky="w")
+                font=("Arial", row_font_size),
+            ).pack(side="left")
 
-            ctk.CTkLabel(
-                row,
-                text=str(team.points),
-                font=("Arial", 12),
-            ).grid(row=0, column=3, padx=4, pady=2)
-
-            ctk.CTkLabel(
-                row,
-                text=str(team.cups_hit),
-                font=("Arial", 12),
-            ).grid(row=0, column=4, padx=4, pady=2)
-
-            ctk.CTkLabel(
-                row,
-                text=str(team.total_cups_diff),
-                font=("Arial", 12),
-            ).grid(row=0, column=5, padx=4, pady=2)
+            self._create_stat_box(row, 0, 3, str(team.points), stat_box_height, stat_font_size, stat_corner, stat_box_padx, stat_box_pady)
+            self._create_stat_box(row, 0, 4, str(team.cups_hit), stat_box_height, stat_font_size, stat_corner, stat_box_padx, stat_box_pady)
+            self._create_stat_box(row, 0, 5, str(team.total_cups_diff), stat_box_height, stat_font_size, stat_corner, stat_box_padx, stat_box_pady)
 
     def build_group_stage_matches(self, parent, matches):
-        print("STANDINGS parent height:", parent.winfo_height())
-        print("STANDINGS root height:", self.group_stage_view.winfo_height())
-        
         available_height = parent.winfo_height()
-        available_width = parent.winfo_width()
-
-        title_height = 50
-        bottom_margin = 12
-
         row_count = max(1, len(matches))
-        row_height = (available_height - title_height - bottom_margin) / row_count
-        row_height = max(32, min(120, int(row_height)))
 
-        title_font = max(14, int(row_height * 0.42))
-        time_font = max(8, int(row_height * 0.22))
-        team_font = max(9, int(row_height * 0.24))
-        vs_font = max(9, int(row_height * 0.24))
+        title_font_size = max(12, min(20, int(available_height * 0.022)))
+        title_block_height = max(22, int(title_font_size * 1.5))
+
+        outer_padding = 4
+        row_gap = 1
+
+        reserved_height = (
+            title_block_height
+            + outer_padding * 2
+            + row_count * (row_gap * 2)
+        )
+
+        usable_height = max(60, available_height - reserved_height)
+        row_height = usable_height // row_count
+        row_height = max(14, min(52, row_height))
+
+        time_font_size = max(7, min(11, int(row_height * 0.28)))
+        team_font_size = max(7, min(13, int(row_height * 0.36)))
+        vs_font_size = max(7, min(13, int(row_height * 0.34)))
+        row_corner = max(4, int(row_height * 0.22))
+        row_inner_pady = max(0, int(row_height * 0.10))
+        print("Matches")
+        print("available_height:", available_height)
+        print("title_block_height:", title_block_height)
+        print("reserved_height:", reserved_height)
+        print("usable_height:", max(60, available_height - reserved_height))
+        print("row_count: ", row_count)
+        print("row height: ", row_height)
 
         title = ctk.CTkLabel(
             parent,
             text=t("matches"),
-            font=("Arial", title_font, "bold"),
+            font=("Arial", title_font_size, "bold"),
         )
-        title.pack(pady=(10, 12))
+        title.pack(pady=(2, 2))
 
         rows = ctk.CTkFrame(parent, fg_color="transparent")
         rows.pack(fill="both", expand=True, padx=4, pady=0)
@@ -465,48 +561,48 @@ class TournamentBracketCanvas(ctk.CTkFrame):
             row = ctk.CTkFrame(
                 rows,
                 fg_color="#333333",
-                corner_radius=max(8, int(row_height * 0.18)),
+                corner_radius=row_corner,
                 height=row_height,
             )
-            row.pack(fill="x", padx=6, pady=2, expand=True)
+            row.pack(fill="x", padx=4, pady=row_gap, expand=True)
             row.pack_propagate(False)
 
-            row.grid_columnconfigure(0, weight=2)  # tid
-            row.grid_columnconfigure(1, weight=4)  # team1
-            row.grid_columnconfigure(2, weight=1)  # vs
-            row.grid_columnconfigure(3, weight=4)  # team2
+            row.grid_columnconfigure(0, weight=2)
+            row.grid_columnconfigure(1, weight=4)
+            row.grid_columnconfigure(2, weight=1)
+            row.grid_columnconfigure(3, weight=4)
 
             team1_name = match.team1.name if match.team1 else t("tbd")
             team2_name = match.team2.name if match.team2 else t("tbd")
-            time_text = match.time if match.time else t("tbd")
+            time_text = match.time if match.time else ""
 
-            font1 = ("Arial", team_font, "overstrike") if match.played and match.winner == 2 else ("Arial", team_font)
-            font2 = ("Arial", team_font, "overstrike") if match.played and match.winner == 1 else ("Arial", team_font)
+            font1 = ("Arial", team_font_size, "overstrike") if match.played and match.winner == 2 else ("Arial", team_font_size)
+            font2 = ("Arial", team_font_size, "overstrike") if match.played and match.winner == 1 else ("Arial", team_font_size)
 
             ctk.CTkLabel(
                 row,
                 text=time_text,
-                font=("Arial", time_font),
+                font=("Arial", time_font_size),
                 text_color="#cccccc",
-            ).grid(row=0, column=0, padx=6, pady=4, sticky="w")
+            ).grid(row=0, column=0, padx=4, pady=row_inner_pady, sticky="w")
 
             ctk.CTkLabel(
                 row,
                 text=team1_name,
                 font=font1,
-            ).grid(row=0, column=1, padx=6, pady=4, sticky="e")
+            ).grid(row=0, column=1, padx=4, pady=row_inner_pady, sticky="e")
 
             ctk.CTkLabel(
                 row,
                 text=t("vs"),
-                font=("Arial", vs_font, "bold"),
-            ).grid(row=0, column=2, padx=6, pady=4)
+                font=("Arial", vs_font_size, "bold"),
+            ).grid(row=0, column=2, padx=4, pady=row_inner_pady)
 
             ctk.CTkLabel(
                 row,
                 text=team2_name,
                 font=font2,
-            ).grid(row=0, column=3, padx=6, pady=4, sticky="w")
+            ).grid(row=0, column=3, padx=4, pady=row_inner_pady, sticky="w")
 
     def draw_bracket(self):
         self.show_bracket_view()
