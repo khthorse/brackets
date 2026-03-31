@@ -292,4 +292,8 @@ def set_language(lang: str):
 
 
 def t(key: str) -> str:
-    return LANGUAGES[_current_lang].get(key, key)
+    try:
+        return LANGUAGES[_current_lang].get(key, key)
+    except KeyError:
+        print(f"Missing translation: {key}")
+        return key
