@@ -112,16 +112,9 @@ def build_timers(timer_frame, settings, screen_height):
     scale = count_scale * resolution_scale
 
     for i in range(timer_count):
-        label = (
-            t("table_label").format(index=i + 1)
-            if timer_count > 1
-            else t("countdown_timer")
-        )
-
         timer = Timer(
             master=timer_frame,
             initial_time=settings.default_timer_seconds,
-            timer_label=label,
             show_controls=False,
             settings=settings,
             scale=scale,

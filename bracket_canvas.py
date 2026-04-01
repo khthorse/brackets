@@ -647,22 +647,18 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         return row_view
     
     def _create_stat_box(self, parent, row, column, value, font_size, corner_radius, padx, pady):
-        box = ctk.CTkFrame(
+        label = ctk.CTkLabel(
             parent,
+            text=value,
             fg_color=self.ui.bg_stat_box,
             corner_radius=corner_radius,
-        )
-        box.grid(row=row, column=column, padx=padx, pady=pady, sticky="nsew")
-
-        label = ctk.CTkLabel(
-            box,
-            text=value,
-            fg_color="transparent",
             font=(self.ui.font_mono, font_size, "bold"),
+            text_color=self.ui.text_primary,
         )
-        label.pack(expand=True, fill="both", padx=4, pady=2)
 
-        return box, label
+        label.grid(row=row, column=column, padx=padx, pady=pady, sticky="nsew")
+
+        return label, label
     
     def _update_standings_row_styles(self):
         self.update_idletasks()

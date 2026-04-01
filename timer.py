@@ -1,4 +1,5 @@
 import time
+import math
 import threading
 
 import customtkinter as ctk
@@ -20,7 +21,6 @@ class Timer:
         self,
         master,
         initial_time,
-        timer_label,
         show_controls=True,
         settings=None,
         scale=1.0,
@@ -49,35 +49,37 @@ class Timer:
         self._start_timestamp = None
         self._remaining_before_start = float(initial_time)
 
-        outer_pad_y = max(6, int(20 * self.scale))
-        outer_pad_x = max(6, int(20 * self.scale))
+        metrics = self._calc_timer_metrics()
 
-        self.frame = ctk.CTkFrame(master)
+        outer_pad_y = metrics["outer_pad_y"]
+        outer_pad_x = metrics["outer_pad_x"]
+
+        self.frame = ctk.CTkFrame(master, fg_color=self.ui.timer_bg)
         self.frame.pack(pady=outer_pad_y, padx=outer_pad_x)
 
-        title_font_size = max(18, int(50 * self.scale))
-        title_pad_y = max(4, int(10 * self.scale))
-        title_pad_x = max(2, int(5 * self.scale))
+        title_font_size = metrics["title_font_size"]
+        title_pad_y = metrics["title_pad_y"]
+        title_pad_x = metrics["title_pad_x"]
 
         self._timer_label = ctk.CTkLabel(
             self.frame,
             text=self.get_timer_title_text(),
-            font=("Helvetica", title_font_size)
+            font=(self.ui.font_timer, title_font_size),
+            text_color=self.ui.timer_text,
         )
         self._timer_label.pack(pady=title_pad_y, padx=title_pad_x)
 
-        self.canvas_size = max(120, int(250 * self.scale))
-        pad = max(4, int(10 * self.scale))
+        self.canvas_size = metrics["canvas_size"]
+        pad = metrics["arc_pad"]
 
-        bg_color = self.ui.timer_bg
         self.canvas = ctk.CTkCanvas(
             self.frame,
             width=self.canvas_size,
             height=self.canvas_size,
-            bg=bg_color,
+            bg=self.ui.timer_bg,
             highlightthickness=0,
         )
-        canvas_pad_y = max(2, int(5 * self.scale))
+        canvas_pad_y = metrics["canvas_pad_y"]
         self.canvas.pack(pady=canvas_pad_y)
 
         self.arc = self.canvas.create_arc(
@@ -89,31 +91,33 @@ class Timer:
             extent=0,
             style="arc",
             width=self.base_arc_width,
-            outline=self.ui.timer_arc,
+            outline=self.ui.timer_arc_idle,
         )
  
-        time_font_size = max(18, int(40 * self.scale))
+        time_font_size = metrics["time_font_size"]
 
         self.canvas_text = self.canvas.create_text(
             self.canvas_size / 2,
             self.canvas_size / 2,
             text="",
-            font=("Helvetica", time_font_size),
+            font=(self.ui.font_timer, time_font_size),
             fill=self.ui.timer_text,
         )
 
         if self.show_controls:
-            button_frame_pad_y = max(4, int(10 * self.scale))
-            button_frame_pad_x = max(4, int(10 * self.scale))
+            button_frame_pad_y = metrics["button_frame_pad_y"]
+            button_frame_pad_x = metrics["button_frame_pad_x"]
 
-            self.buttonframe = ctk.CTkFrame(self.frame)
+            self.buttonframe = ctk.CTkFrame(self.frame, fg_color="transparent")
             self.buttonframe.pack(pady=button_frame_pad_y, padx=button_frame_pad_x)
 
-            button_font_size = max(11, int(13 * self.scale))
-            button_width = max(70, int(140 * self.scale))
-            button_height = max(28, int(36 * self.scale))
-            button_pad_x = max(3, int(10 * self.scale))
-            button_pad_y = max(3, int(5 * self.scale))
+
+
+            button_font_size = metrics["button_font_size"]
+            button_width = metrics["button_width"]
+            button_height = metrics["button_height"]
+            button_pad_x = metrics["button_pad_x"]
+            button_pad_y = metrics["button_pad_y"]
 
             self.start_button = ctk.CTkButton(
                 self.buttonframe,
@@ -121,7 +125,10 @@ class Timer:
                 command=self.countdown,
                 width=button_width,
                 height=button_height,
-                font=("Helvetica", button_font_size),
+                fg_color=self.ui.button_fg,
+                hover_color=self.ui.button_hover,
+                font=(self.ui.font_timer, button_font_size),
+                text_color=self.ui.button_text,
             )
             self.start_button.grid(row=0, column=0, padx=button_pad_x, pady=button_pad_y)
 
@@ -131,7 +138,10 @@ class Timer:
                 command=self.toggle_pause,
                 width=button_width,
                 height=button_height,
-                font=("Helvetica", button_font_size),
+                fg_color=self.ui.button_fg,
+                hover_color=self.ui.button_hover,
+                font=(self.ui.font_timer, button_font_size),
+                text_color=self.ui.button_text,
             )
             self.pause_button.grid(row=0, column=1, padx=button_pad_x, pady=button_pad_y)
 
@@ -141,7 +151,10 @@ class Timer:
                 command=self.reset_timer,
                 width=button_width,
                 height=button_height,
-                font=("Helvetica", button_font_size),
+                fg_color=self.ui.button_fg,
+                hover_color=self.ui.button_hover,
+                font=(self.ui.font_timer, button_font_size),
+                text_color=self.ui.button_text,
             )
             self.reset_button.grid(row=1, column=0, padx=button_pad_x, pady=button_pad_y)
 
@@ -151,21 +164,49 @@ class Timer:
                 command=self.open_change_time_popup,
                 width=button_width,
                 height=button_height,
-                font=("Helvetica", button_font_size),
+                fg_color=self.ui.button_fg,
+                hover_color=self.ui.button_hover,
+                font=(self.ui.font_timer, button_font_size),
+                text_color=self.ui.button_text,
             )
             self.change_time_button.grid(row=1, column=1, padx=button_pad_x, pady=button_pad_y)
 
         self.update_label()
 
+    def _calc_timer_metrics(self):
+        ui = self.ui
+        s = self.scale
+
+        return {
+            "outer_pad_y": max(ui.timer_min_outer_pad, int(20 * s)),
+            "outer_pad_x": max(ui.timer_min_outer_pad, int(20 * s)),
+            "title_font_size": max(ui.timer_min_title_font, int(50 * s)),
+            "title_pad_y": max(4, int(10 * s)),
+            "title_pad_x": max(2, int(5 * s)),
+            "canvas_size": max(ui.timer_min_canvas_size, int(250 * s)),
+            "arc_pad": max(ui.timer_min_arc_pad, int(10 * s)),
+            "arc_width": max(ui.timer_min_arc_width, int(15 * s)),
+            "canvas_pad_y": max(2, int(5 * s)),
+            "time_font_size": max(ui.timer_min_time_font, int(40 * s)),
+            "button_font_size": max(ui.timer_min_button_font, int(13 * s)),
+            "button_width": max(ui.timer_min_button_width, int(140 * s)),
+            "button_height": max(ui.timer_min_button_height, int(36 * s)),
+            "button_pad_x": max(ui.timer_min_button_pad_x, int(10 * s)),
+            "button_pad_y": max(ui.timer_min_button_pad_y, int(5 * s)),
+            "button_frame_pad_y": max(4, int(10 * s)),
+            "button_frame_pad_x": max(4, int(10 * s)),
+        }
+
     def set_scale(self, new_scale: float):
         self.scale = new_scale
-        self.base_arc_width = max(6, int(15 * self.scale))
+        metrics = self._calc_timer_metrics()
+        self.base_arc_width = metrics["arc_width"]
 
         # oppdater canvas størrelse
-        self.canvas_size = max(120, int(250 * self.scale))
+        self.canvas_size = metrics["canvas_size"]
         self.canvas.configure(width=self.canvas_size, height=self.canvas_size)
 
-        pad = max(4, int(10 * self.scale))
+        pad = metrics["arc_pad"]
 
         self.canvas.coords(
             self.arc,
@@ -182,11 +223,11 @@ class Timer:
         )
 
         # oppdater fonter
-        title_font_size = max(18, int(50 * self.scale))
-        time_font_size = max(18, int(40 * self.scale))
+        title_font_size = metrics["title_font_size"]
+        time_font_size = metrics["time_font_size"]
 
-        self._timer_label.configure(font=("Helvetica", title_font_size))
-        self.canvas.itemconfig(self.canvas_text, font=("Helvetica", time_font_size))
+        self._timer_label.configure(font=(self.ui.font_timer, title_font_size))
+        self.canvas.itemconfig(self.canvas_text, font=(self.ui.font_timer, time_font_size))
 
         self.update_label()
 
@@ -282,12 +323,12 @@ class Timer:
         # Ikke tegn bue før den er stor nok til å se pen ut
         if self.initial_time > 30:
             if abs(ext) < 0.3:
-                self.canvas.itemconfig(self.arc, extent=0, outline="#2b2b2b", width=self.base_arc_width)
+                self.canvas.itemconfig(self.arc, extent=0, outline=self.ui.timer_arc_idle, width=self.base_arc_width)
             else:
                 self.canvas.itemconfig(self.arc, extent=ext, outline=color, width=arc_width)
         else:
             if progress == 0:
-                self.canvas.itemconfig(self.arc, extent=0, outline="#2b2b2b", width=self.base_arc_width)
+                self.canvas.itemconfig(self.arc, extent=0, outline=self.ui.timer_arc_idle, width=self.base_arc_width)
             elif abs(ext) < 8:
                 self.canvas.itemconfig(self.arc, extent=-8, outline=color, width=arc_width)
             else:
@@ -386,8 +427,8 @@ class Timer:
             self.canvas.itemconfig(self.canvas_text, text=t("finished"), fill=color)
             self.canvas.itemconfig(self.arc, outline=color, width=self.base_arc_width)
         else:
-            self.canvas.itemconfig(self.canvas_text, text=t("finished"), fill="#2b2b2b")
-            self.canvas.itemconfig(self.arc, outline="#2b2b2b", width=self.base_arc_width)
+            self.canvas.itemconfig(self.canvas_text, text=t("finished"), fill=self.ui.timer_text_dim)
+            self.canvas.itemconfig(self.arc, outline=self.ui.timer_arc_idle, width=self.base_arc_width)
 
         self._blink_on = not self._blink_on
         self._notify_observers()
@@ -441,7 +482,7 @@ class Timer:
         if hasattr(self, "pause_button"):
             self.pause_button.configure(text=t("pause"))
 
-        self.canvas.itemconfig(self.canvas_text, fill="white")
+        self.canvas.itemconfig(self.canvas_text, fill=self.ui.timer_text)
         self.update_label()
 
     def set_time_from_input(self, value: str):
@@ -492,30 +533,22 @@ class Timer:
         else:
             fraction_left = 0.0
 
-        blue   = "#6CA0DC"
-        yellow = "#E6C229"
-        red    = "#D1495B"  
+        ok_color = self.ui.timer_arc_ok
+        warning_color = self.ui.timer_arc_warning
+        danger_color = self.ui.timer_arc_danger
 
-        #white  = "#EAEAEA"
-        #yellow = "#FFC857"
-        #red    = "#FF5A5F"
-
-        # Hold blå lenge
         if fraction_left > 0.35:
-            return blue
+            return ok_color
 
-        # Myk overgang blå -> gul
         if 0.25 < fraction_left <= 0.35:
             t = (0.35 - fraction_left) / 0.10
-            return self._lerp_color(blue, yellow, t)
+            return self._lerp_color(ok_color, warning_color, t)
 
-        # Hold gul en stund
         if 0.10 < fraction_left <= 0.25:
-            return yellow
+            return warning_color
 
-        # Myk overgang gul -> rød
         t = (0.10 - fraction_left) / 0.10 if fraction_left >= 0 else 1.0
-        return self._lerp_color(yellow, red, t)
+        return self._lerp_color(warning_color, danger_color, t)
 
     def _lerp_color(self, start_hex: str, end_hex: str, t: float) -> str:
         t = max(0.0, min(1.0, t))
@@ -542,7 +575,6 @@ class Timer:
         if fraction_left > 0.10:
             return 0.0
 
-        import math
         return 0.5 + 0.5 * math.sin(self._pulse_phase)
 
 
@@ -550,5 +582,5 @@ if __name__ == "__main__":
     ctk.set_appearance_mode("dark")
     root = ctk.CTk()
     root.title(t("countdown_timer"))
-    timer = Timer(master=root, initial_time=20, timer_label=t("countdown_timer"))
+    timer = Timer(master=root, initial_time=20)
     root.mainloop()

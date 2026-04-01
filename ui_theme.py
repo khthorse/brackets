@@ -7,8 +7,8 @@ class UITheme:
     # BASE COLORS
     # ============================================================
     bg_main: str = "#2b2b2b"
-    bg_panel: str = "#333333"
-    bg_panel_alt: str = "#3a3a3a"
+    bg_row_normal: str = "#333333"
+    bg_row_top: str = "#3a3a3a"
     bg_stat_box: str = "#1f1f1f"
 
     text_primary: str = "white"
@@ -30,7 +30,7 @@ class UITheme:
     # ============================================================
     # FONT FAMILIES
     # ============================================================
-    font_main: str = "Arial"
+    font_main: str = "Helvetica"
     font_mono: str = "Consolas"
     font_bracket: str = "Helvetica"
     font_timer: str = "Helvetica"
@@ -59,10 +59,10 @@ class UITheme:
     stat_box_pady_scale: float = 0.12
 
     min_row_font: int = 8
-    max_row_font: int = 14
+    max_row_font: int = 30
 
     min_stat_font: int = 7
-    max_stat_font: int = 11
+    max_stat_font: int = 20
 
     min_corner: int = 4
     min_logo_size: int = 10
@@ -101,6 +101,41 @@ class UITheme:
     timer_arc_warning: str = "#E6C229"
     timer_arc_danger: str = "#D1495B"
     timer_text: str = "white"
+    timer_text_dim: str = "#777777"
+    button_fg: str = "#3f3f3f"
+    button_hover: str = "#4a4a4a"
+    button_text: str = "white"
+
+    # ============================================================
+    # TIMER SIZING
+    # ============================================================
+    timer_outer_pad_scale: float = 20 / 1080
+    timer_title_scale: float = 50 / 1080
+    timer_title_pad_y_scale: float = 10 / 1080
+    timer_title_pad_x_scale: float = 5 / 1080
+    timer_canvas_scale: float = 250 / 1080
+    timer_canvas_pad_y_scale: float = 5 / 1080
+    timer_arc_pad_scale: float = 10 / 1080
+    timer_arc_width_scale: float = 15 / 1080
+    timer_button_font_scale: float = 13 / 1080
+    timer_button_width_scale: float = 140 / 1080
+    timer_button_height_scale: float = 36 / 1080
+    timer_button_pad_x_scale: float = 10 / 1080
+    timer_button_pad_y_scale: float = 5 / 1080
+    timer_time_font_scale: float = 40 / 1080
+
+    # Minimums
+    timer_min_outer_pad: int = 6
+    timer_min_title_font: int = 18
+    timer_min_canvas_size: int = 120
+    timer_min_arc_pad: int = 4
+    timer_min_arc_width: int = 6
+    timer_min_button_font: int = 11
+    timer_min_button_width: int = 70
+    timer_min_button_height: int = 28
+    timer_min_button_pad_x: int = 3
+    timer_min_button_pad_y: int = 3
+    timer_min_time_font: int = 18
 
     # ============================================================
     # BRACKET
@@ -122,19 +157,4 @@ def get_dark_theme():
 
 
 def get_light_theme():
-    return UITheme(
-        bg_main="#f5f5f5",
-        bg_panel="#ffffff",
-        bg_panel_alt="#eaeaea",
-        bg_stat_box="#dddddd",
-        text_primary="black",
-        text_muted="#555555",
-        text_neutral="#777777",
-        border_subtle="#c8c8c8",
-        accent="#2f80ed",
-        timer_bg="#f5f5f5",
-        timer_arc_idle="#f5f5f5",
-        timer_text="black",
-        bracket_line_color="black",
-        winner_text="black",
-    )
+    return UITheme()
