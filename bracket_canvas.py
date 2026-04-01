@@ -168,7 +168,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
             size / 2,
             size / 2,
             text=self.loading_text_base,
-            font=("Helvetica", 18, "bold"),
+            font=(self.ui.font_bracket, self.ui.loading_font_size, "bold"),
             fill=self.ui.text_primary,
         )
 
@@ -231,15 +231,15 @@ class TournamentBracketCanvas(ctk.CTkFrame):
             canvas_width / 2,
             canvas_height / 2 - 300,
             text=t("winner_of_tournament"),
-            font=("Arial", 60),
-            fill="white",
+            font=(self.ui.font_main, 60),
+            fill=self.ui.winner_text
         )
         self.canvas.create_text(
             canvas_width / 2,
             canvas_height / 2 - 200,
             text=winner.name,
-            font=("Arial", 60),
-            fill="white",
+            font=(self.ui.font_main, 60),
+            fill=self.ui.winner_text
         )
 
         if winner.logo:
@@ -255,82 +255,6 @@ class TournamentBracketCanvas(ctk.CTkFrame):
                 self.images.append(logo_img)
             except Exception as e:
                 print(f"Error when loading logo: {e}")
-    ''' 
-        Deprecated
-
-    def draw_standings_table(self, x, y, width, row_height, standings, scale):
-        headers = ["#", t("team_label"), t("points_short"), t("hit_short"), t("diff_short")]
-
-        # Kolonnebredder som andel av total bredde
-        col_widths = [0.08, 0.52, 0.13, 0.13, 0.14]
-
-        header_font = ("Arial", max(10, int(14 * scale)), "bold")
-        cell_font = ("Arial", max(9, int(13 * scale)))
-
-        # Regn ut x-posisjoner for kolonnene
-        col_x = [x]
-        for fraction in col_widths:
-            col_x.append(col_x[-1] + fraction * width)
-
-        # Header-rad
-        for i, header in enumerate(headers):
-            self.canvas.create_rectangle(
-                col_x[i],
-                y,
-                col_x[i + 1],
-                y + row_height,
-                fill="#2b2b2b",
-                outline="#444444",
-            )
-
-            self.canvas.create_text(
-                (col_x[i] + col_x[i + 1]) / 2,
-                y + row_height / 2,
-                text=header,
-                fill="white",
-                font=header_font,
-            )
-
-        # Datarader
-        for row_idx, team in enumerate(standings):
-            row_y0 = y + row_height * (row_idx + 1)
-            row_y1 = row_y0 + row_height
-
-            values = [
-                str(row_idx + 1),
-                team.name,
-                str(team.points),
-                str(team.cups_hit),
-                str(team.total_cups_diff),
-            ]
-
-            for i, value in enumerate(values):
-                self.canvas.create_rectangle(
-                    col_x[i],
-                    row_y0,
-                    col_x[i + 1],
-                    row_y1,
-                    fill="#333333",
-                    outline="#444444",
-                )
-
-                # Venstrejuster bare lagnavn
-                if i == 1:
-                    text_x = col_x[i] + 10
-                    anchor = "w"
-                else:
-                    text_x = (col_x[i] + col_x[i + 1]) / 2
-                    anchor = "center"
-
-                self.canvas.create_text(
-                    text_x,
-                    (row_y0 + row_y1) / 2,
-                    text=value,
-                    fill="white",
-                    font=cell_font,
-                    anchor=anchor,
-                )
-    '''
 
     def _schedule_group_stage_rebuild(self, delay=30):
         if self._group_stage_rebuild_job is not None:
