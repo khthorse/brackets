@@ -11,6 +11,7 @@ from translations import t
 class StandingsRowView:
     frame: ctk.CTkFrame
     position_label: ctk.CTkLabel
+    name_wrap: ctk.CTkFrame
     name_label: ctk.CTkLabel
     points_label: ctk.CTkLabel
     hit_label: ctk.CTkLabel
@@ -19,6 +20,15 @@ class StandingsRowView:
     hit_box: Optional[ctk.CTkFrame] = None
     diff_box: Optional[ctk.CTkFrame] = None
     logo_label: Optional[tk.Label] = None
+
+@dataclass
+class MatchRowView:
+    frame: ctk.CTkFrame
+    time_label: ctk.CTkLabel
+    team1_label: ctk.CTkLabel
+    vs_label: ctk.CTkLabel
+    team2_label: ctk.CTkLabel
+
 
 class TournamentBracketCanvas(ctk.CTkFrame):
     """
@@ -43,6 +53,20 @@ class TournamentBracketCanvas(ctk.CTkFrame):
 
         self.standings_rows = []
         self.standings_layout = None
+        self.standings_title_label = None
+        self.standings_header = None
+        self.standings_rows_container = None
+        self.matches_title_label = None
+        self.matches_rows_container = None
+        self.matches_row_views = []
+
+        self.loading_window = None
+        self.loading_canvas = None
+        self.loading_circle = None
+        self.loading_text_item = None
+        self.loading_text_base = None
+        self._loading_job = None
+        self._loading_step = 0
 
         self.bracket_view = ctk.CTkFrame(self, fg_color="#2b2b2b")
         self.bracket_view.pack(fill="both", expand=True)
@@ -69,6 +93,107 @@ class TournamentBracketCanvas(ctk.CTkFrame):
 
         if not self.group_stage_view.winfo_manager():
             self.group_stage_view.pack(fill="both", expand=True)
+
+    def show_loading_overlay(self, text=None):
+        self.hide_loading_overlay()
+
+        root = self.winfo_toplevel()
+        root.update_idletasks()
+
+        x = root.winfo_rootx()
+        y = root.winfo_rooty()
+        w = root.winfo_width()
+        h = root.winfo_height()
+
+        self.loading_window = tk.Toplevel(root)
+        self.loading_window.overrideredirect(True)
+        self.loading_window.geometry(f"{w}x{h}+{x}+{y}")
+        self.loading_window.configure(bg="#2b2b2b")
+        self.loading_window.attributes("-topmost", True)
+
+        size = 220
+        pad = 18
+        line_width = 10
+
+        self.loading_canvas = tk.Canvas(
+            self.loading_window,
+            width=size,
+            height=size,
+            bg="#2b2b2b",
+            highlightthickness=0,
+            bd=0,
+        )
+        self.loading_canvas.place(relx=0.5, rely=0.5, anchor="center")
+
+        self.loading_circle = self.loading_canvas.create_oval(
+            pad,
+            pad,
+            size - pad,
+            size - pad,
+            width=line_width,
+            outline="#4682B4",
+        )
+
+        self.loading_text_base = text if text is not None else t("loading")
+        self._loading_step = 0
+
+        self.loading_text_item = self.loading_canvas.create_text(
+            size / 2,
+            size / 2,
+            text=self.loading_text_base,
+            font=("Helvetica", 18, "bold"),
+            fill="white",
+        )
+
+        self.loading_window.update()
+        self._loading_job = self.after(100, self._animate_loading_text)
+
+    def _animate_loading_text(self):
+        if self.loading_canvas is None or self.loading_text_item is None:
+            return
+
+        try:
+            if not self.loading_canvas.winfo_exists():
+                return
+        except Exception:
+            return
+
+        states = [
+            self.loading_text_base,
+            self.loading_text_base + ".",
+            self.loading_text_base + "..",
+            self.loading_text_base + "...",
+        ]
+
+        self._loading_step = (self._loading_step + 1) % len(states)
+        self.loading_canvas.itemconfigure(
+            self.loading_text_item,
+            text=states[self._loading_step]
+        )
+
+        self._loading_job = self.after(350, self._animate_loading_text)
+
+    def hide_loading_overlay(self):
+        if self._loading_job is not None:
+            try:
+                self.after_cancel(self._loading_job)
+            except Exception:
+                pass
+            self._loading_job = None
+
+        if self.loading_window is not None:
+            try:
+                if self.loading_window.winfo_exists():
+                    self.loading_window.destroy()
+            except Exception:
+                pass
+
+        self.loading_window = None
+        self.loading_canvas = None
+        self.loading_circle = None
+        self.loading_text_item = None
+        self.loading_text_base = None
+        self._loading_step = 0
 
     def show_winner_popup(self, winner):
         canvas_width = self.canvas.winfo_width()
@@ -213,23 +338,75 @@ class TournamentBracketCanvas(ctk.CTkFrame):
             self._schedule_group_stage_rebuild(delay=30)
             return
 
-        for child in standings_frame.winfo_children():
-            child.destroy()
-        for child in matches_frame.winfo_children():
-            child.destroy()
-
         standings = self.group_stage_model.standings()
         matches = self.group_stage_model.matches
 
-        self.build_group_stage_standings(standings_frame, standings, matches)
-        self.build_group_stage_matches(matches_frame, matches)
+        self.refresh_group_stage_standings(standings_frame, standings, matches)
+        self.refresh_group_stage_matches(matches_frame, matches)
+        self.after(120, self.hide_loading_overlay)
+
+    def refresh_group_stage_standings(self, parent, standings, matches):
+        if self.standings_rows_container is None or not self.standings_rows_container.winfo_exists():
+            self.build_group_stage_standings(parent, standings, matches)
+            return
+
+        current_count = len(self.standings_rows)
+        new_count = len(standings)
+
+        # Hvis antall lag har endret seg, bygg på nytt
+        if current_count != new_count:
+            for child in parent.winfo_children():
+                child.destroy()
+
+            self.standings_rows = []
+            self.standings_title_label = None
+            self.standings_header = None
+            self.standings_rows_container = None
+
+            self.build_group_stage_standings(parent, standings, matches)
+            return
+
+        self.update_group_stage_standings(standings, matches)
+
+    def update_group_stage_standings(self, standings, matches):
+        for idx, (team, row_view) in enumerate(zip(standings, self.standings_rows), start=1):
+            row_view.position_label.configure(text=str(idx))
+            row_view.name_label.configure(text=team.name)
+            row_view.points_label.configure(text=str(team.points))
+            row_view.hit_label.configure(text=str(team.cups_hit))
+            row_view.diff_label.configure(text=str(team.total_cups_diff))
+
+            row_color = "#3a3a3a" if idx <= 4 else "#333333"
+            row_view.frame.configure(fg_color=row_color)
+
+            if row_view.logo_label is not None:
+                try:
+                    row_view.logo_label.configure(bg=row_color)
+                except Exception:
+                    pass
+
+        self.after(10, self._update_standings_row_styles)
+
 
     def show_group_stage(self, group_stage_model):
         self.group_stage_model = group_stage_model
         self.show_group_stage_view()
+        self.show_loading_overlay()
 
+        self.after(50, self._build_group_stage_layout)
+
+    def _build_group_stage_layout(self):
         for child in self.group_stage_view.winfo_children():
             child.destroy()
+
+        self.standings_rows = []
+        self.standings_title_label = None
+        self.standings_header = None
+        self.standings_rows_container = None
+
+        self.matches_title_label = None
+        self.matches_rows_container = None
+        self.matches_row_views = []
 
         content = ctk.CTkFrame(self.group_stage_view, fg_color="transparent")
         content.pack(fill="both", expand=True, padx=20, pady=(0, 20))
@@ -249,12 +426,15 @@ class TournamentBracketCanvas(ctk.CTkFrame):
 
         self._group_stage_frames = (standings_frame, matches_frame)
 
-        # Rebuild når layout er klar
         self._schedule_group_stage_rebuild(delay=30)
 
-        # Rebuild ved resize, men debounce-et
         standings_frame.bind("<Configure>", lambda _e: self._schedule_group_stage_rebuild(delay=60))
         matches_frame.bind("<Configure>", lambda _e: self._schedule_group_stage_rebuild(delay=60))
+
+    def refresh_group_stage(self):
+        if self.group_stage_model is None:
+            return
+        self._schedule_group_stage_rebuild(delay=10)
         
     def get_position_trend(self, team_name, current_position):
         previous_position = self.previous_standings_positions.get(team_name)
@@ -385,7 +565,48 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         ).grid(row=0, column=5, padx=2, pady=1)
 
         return header
-    
+
+    def _set_team_name_and_logo(self, row_view, team, row_color, logo_size):
+        for child in row_view.name_wrap.winfo_children():
+            child.destroy()
+
+        logo_label = None
+
+        if team.logo:
+            try:
+                cache_key = (team.logo, logo_size)
+
+                if cache_key in self.logo_cache:
+                    logo_img = self.logo_cache[cache_key]
+                else:
+                    img = Image.open(team.logo)
+                    img.thumbnail((logo_size, logo_size), Image.LANCZOS)
+                    logo_img = ImageTk.PhotoImage(img)
+                    self.logo_cache[cache_key] = logo_img
+
+                self.images.append(logo_img)
+
+                logo_label = tk.Label(
+                    row_view.name_wrap,
+                    image=logo_img,
+                    bg=row_color,
+                    bd=0,
+                    highlightthickness=0,
+                )
+                logo_label.image = logo_img
+                logo_label.pack(side="left", padx=(0, 4))
+            except Exception as e:
+                print(f"Error loading logo: {e}")
+
+        row_view.name_label = ctk.CTkLabel(
+            row_view.name_wrap,
+            text=team.name,
+            font=("Arial", 12),  # blir overskrevet i style-update
+        )
+        row_view.name_label.pack(side="left")
+
+        row_view.logo_label = logo_label
+
     def _build_standings_row(
         self,
         parent,
@@ -436,32 +657,12 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         name_wrap = ctk.CTkFrame(row, fg_color="transparent")
         name_wrap.grid(row=0, column=2, padx=row_inner_padx, pady=row_inner_pady, sticky="w")
 
-        logo_label = None
-        if team.logo:
-            try:
-                img = Image.open(team.logo)
-                img.thumbnail((logo_size, logo_size), Image.LANCZOS)
-                logo_img = ImageTk.PhotoImage(img)
-                self.images.append(logo_img)
-
-                logo_label = tk.Label(
-                    name_wrap,
-                    image=logo_img,
-                    bg=row_color,
-                    bd=0,
-                    highlightthickness=0,
-                )
-                logo_label.image = logo_img
-                logo_label.pack(side="left", padx=(0, 4))
-            except Exception as e:
-                print(f"Error loading logo: {e}")
-
-        name_label = ctk.CTkLabel(
+        placeholder_name_label = ctk.CTkLabel(
             name_wrap,
             text=team.name,
             font=("Arial", row_font_size),
         )
-        name_label.pack(side="left")
+        placeholder_name_label.pack(side="left")
 
         points_box, points_label = self._create_stat_box(
             row, 0, 3, str(team.points),
@@ -476,18 +677,23 @@ class TournamentBracketCanvas(ctk.CTkFrame):
             font_size=stat_font_size, corner_radius=stat_corner, padx=stat_box_padx, pady=stat_box_pady
         )
 
-        return StandingsRowView(
+        row_view = StandingsRowView(
             frame=row,
             position_label=position_label,
-            name_label=name_label,
+            name_wrap=name_wrap,
+            name_label=placeholder_name_label,
             points_label=points_label,
             hit_label=hit_label,
             diff_label=diff_label,
             points_box=points_box,
             hit_box=hit_box,
             diff_box=diff_box,
-            logo_label=logo_label,
+            logo_label=None,
         )
+
+        self._set_team_name_and_logo(row_view, team, row_color, logo_size)
+
+        return row_view
     
     def _create_stat_box(self, parent, row, column, value, font_size, corner_radius, padx, pady):
         box = ctk.CTkFrame(
@@ -538,6 +744,12 @@ class TournamentBracketCanvas(ctk.CTkFrame):
             if row_view.diff_box is not None:
                 row_view.diff_box.configure(corner_radius=stat_corner)
 
+            if row_view.logo_label is not None:
+                try:
+                    row_view.logo_label.configure(bg=row_view.frame.cget("fg_color"))
+                except Exception:
+                    pass
+
     def build_group_stage_standings(self, parent, standings, matches):
         self.standings_parent = parent
         self.standings_rows = []
@@ -566,17 +778,19 @@ class TournamentBracketCanvas(ctk.CTkFrame):
 
         logo_size = max(10, int(estimated_row_height * 0.62))
 
-        title = ctk.CTkLabel(
+        self.standings_title_label = ctk.CTkLabel(
             parent,
             text=t("standings"),
             font=("Arial", title_font_size, "bold"),
         )
-        title.pack(pady=(2, 2))
+        self.standings_title_label.pack(pady=(2, 2))
 
-        self._build_standings_header(parent, header_font_size, header_block_height)
+        self.standings_header = self._build_standings_header(parent, header_font_size, header_block_height)
 
-        rows = ctk.CTkFrame(parent, fg_color="transparent")
-        rows.pack(fill="both", expand=True, padx=4, pady=0)
+        self.standings_rows_container = ctk.CTkFrame(parent, fg_color="transparent")
+        self.standings_rows_container.pack(fill="both", expand=True, padx=4, pady=0)
+
+        rows = self.standings_rows_container
 
         rows.grid_columnconfigure(0, weight=1)
         for i in range(len(standings)):
@@ -603,99 +817,171 @@ class TournamentBracketCanvas(ctk.CTkFrame):
             row_view.frame.grid(row=idx - 1, column=0, sticky="nsew", padx=4, pady=2)
 
             self.standings_rows.append(row_view)
-            
+
         self.after(10, self._update_standings_row_styles)
         parent.bind("<Configure>", lambda _e: self.after(10, self._update_standings_row_styles))
-            
-    def build_group_stage_matches(self, parent, matches):
-        available_height = parent.winfo_height()
-        row_count = max(1, len(matches))
 
-        title_font_size = max(12, min(20, int(available_height * 0.022)))
-        title_block_height = max(22, int(title_font_size * 1.5))
+    def refresh_group_stage_matches(self, parent, matches):
+        if self.matches_rows_container is None or not self.matches_rows_container.winfo_exists():
+            self.build_group_stage_matches(parent, matches)
+            return
 
-        outer_padding = 4
-        row_gap = 1
+        current_count = len(self.matches_row_views)
+        new_count = len(matches)
 
-        reserved_height = (
-            title_block_height
-            + outer_padding * 2
-            + row_count * (row_gap * 2)
-        )
+        if current_count != new_count:
+            for child in parent.winfo_children():
+                child.destroy()
 
-        usable_height = max(60, available_height - reserved_height)
-        row_height = usable_height // row_count
-        row_height = max(14, min(52, row_height))
+            self.matches_title_label = None
+            self.matches_rows_container = None
+            self.matches_row_views = []
 
-        time_font_size = max(7, min(11, int(row_height * 0.28)))
-        team_font_size = max(7, min(13, int(row_height * 0.36)))
-        vs_font_size = max(7, min(13, int(row_height * 0.34)))
-        row_corner = max(4, int(row_height * 0.22))
-        row_inner_pady = max(0, int(row_height * 0.10))
-        print("Matches")
-        print("available_height:", available_height)
-        print("title_block_height:", title_block_height)
-        print("reserved_height:", reserved_height)
-        print("usable_height:", max(60, available_height - reserved_height))
-        print("row_count: ", row_count)
-        print("row height: ", row_height)
+            self.build_group_stage_matches(parent, matches)
+            return
 
-        title = ctk.CTkLabel(
-            parent,
-            text=t("matches"),
-            font=("Arial", title_font_size, "bold"),
-        )
-        title.pack(pady=(2, 2))
+        self.update_group_stage_matches(matches)
 
-        rows = ctk.CTkFrame(parent, fg_color="transparent")
-        rows.pack(fill="both", expand=True, padx=4, pady=0)
 
-        for match in matches:
-            row = ctk.CTkFrame(
-                rows,
-                fg_color="#333333",
-                corner_radius=row_corner,
-                height=row_height,
-            )
-            row.pack(fill="x", padx=4, pady=row_gap, expand=True)
-            row.pack_propagate(False)
-
-            row.grid_columnconfigure(0, weight=2)
-            row.grid_columnconfigure(1, weight=4)
-            row.grid_columnconfigure(2, weight=1)
-            row.grid_columnconfigure(3, weight=4)
-
+    def update_group_stage_matches(self, matches):
+        for match, row_view in zip(matches, self.matches_row_views):
             team1_name = match.team1.name if match.team1 else t("tbd")
             team2_name = match.team2.name if match.team2 else t("tbd")
             time_text = match.time if match.time else ""
 
+            row_view.time_label.configure(text=time_text)
+            row_view.team1_label.configure(text=team1_name)
+            row_view.team2_label.configure(text=team2_name)
+            row_view.vs_label.configure(text=t("vs"))
+
+        self.after(10, self._update_match_row_styles)
+
+
+    def _update_match_row_styles(self):
+        self.update_idletasks()
+
+        if self.group_stage_model is None:
+            return
+
+        matches = self.group_stage_model.matches
+
+        for match, row_view in zip(matches, self.matches_row_views):
+            row_height = row_view.frame.winfo_height()
+
+            if row_height <= 1:
+                continue
+
+            time_font_size = max(7, min(11, int(row_height * 0.28)))
+            team_font_size = max(7, min(13, int(row_height * 0.36)))
+            vs_font_size = max(7, min(13, int(row_height * 0.34)))
+            row_corner = max(4, int(row_height * 0.22))
+            row_inner_pady = max(0, int(row_height * 0.10))
+
+            row_view.frame.configure(corner_radius=row_corner)
+            row_view.time_label.configure(font=("Arial", time_font_size))
+            row_view.vs_label.configure(font=("Arial", vs_font_size, "bold"))
+
             font1 = ("Arial", team_font_size, "overstrike") if match.played and match.winner == 2 else ("Arial", team_font_size)
             font2 = ("Arial", team_font_size, "overstrike") if match.played and match.winner == 1 else ("Arial", team_font_size)
 
-            ctk.CTkLabel(
-                row,
-                text=time_text,
-                font=("Arial", time_font_size),
-                text_color="#cccccc",
-            ).grid(row=0, column=0, padx=4, pady=row_inner_pady, sticky="w")
+            row_view.team1_label.configure(font=font1, pady=row_inner_pady)
+            row_view.team2_label.configure(font=font2, pady=row_inner_pady)
 
-            ctk.CTkLabel(
-                row,
-                text=team1_name,
-                font=font1,
-            ).grid(row=0, column=1, padx=4, pady=row_inner_pady, sticky="e")
 
-            ctk.CTkLabel(
-                row,
-                text=t("vs"),
-                font=("Arial", vs_font_size, "bold"),
-            ).grid(row=0, column=2, padx=4, pady=row_inner_pady)
+    def _build_match_row(self, parent, match, row_index, estimated_row_height):
+        row_corner = max(4, int(estimated_row_height * 0.22))
+        row_inner_pady = max(0, int(estimated_row_height * 0.10))
+        time_font_size = max(7, min(11, int(estimated_row_height * 0.28)))
+        team_font_size = max(7, min(13, int(estimated_row_height * 0.36)))
+        vs_font_size = max(7, min(13, int(estimated_row_height * 0.34)))
 
-            ctk.CTkLabel(
-                row,
-                text=team2_name,
-                font=font2,
-            ).grid(row=0, column=3, padx=4, pady=row_inner_pady, sticky="w")
+        row = ctk.CTkFrame(
+            parent,
+            fg_color="#333333",
+            corner_radius=row_corner,
+        )
+        row.grid(row=row_index, column=0, sticky="nsew", padx=4, pady=1)
+        row.grid_columnconfigure(0, weight=2)
+        row.grid_columnconfigure(1, weight=4)
+        row.grid_columnconfigure(2, weight=1)
+        row.grid_columnconfigure(3, weight=4)
+        row.grid_rowconfigure(0, weight=1)
+
+        team1_name = match.team1.name if match.team1 else t("tbd")
+        team2_name = match.team2.name if match.team2 else t("tbd")
+        time_text = match.time if match.time else ""
+
+        font1 = ("Arial", team_font_size, "overstrike") if match.played and match.winner == 2 else ("Arial", team_font_size)
+        font2 = ("Arial", team_font_size, "overstrike") if match.played and match.winner == 1 else ("Arial", team_font_size)
+
+        time_label = ctk.CTkLabel(
+            row,
+            text=time_text,
+            font=("Arial", time_font_size),
+            text_color="#cccccc",
+        )
+        time_label.grid(row=0, column=0, padx=4, pady=row_inner_pady, sticky="w")
+
+        team1_label = ctk.CTkLabel(
+            row,
+            text=team1_name,
+            font=font1,
+        )
+        team1_label.grid(row=0, column=1, padx=4, pady=row_inner_pady, sticky="e")
+
+        vs_label = ctk.CTkLabel(
+            row,
+            text=t("vs"),
+            font=("Arial", vs_font_size, "bold"),
+        )
+        vs_label.grid(row=0, column=2, padx=4, pady=row_inner_pady)
+
+        team2_label = ctk.CTkLabel(
+            row,
+            text=team2_name,
+            font=font2,
+        )
+        team2_label.grid(row=0, column=3, padx=4, pady=row_inner_pady, sticky="w")
+
+        return MatchRowView(
+            frame=row,
+            time_label=time_label,
+            team1_label=team1_label,
+            vs_label=vs_label,
+            team2_label=team2_label,
+        )
+
+    def build_group_stage_matches(self, parent, matches):
+        self.matches_row_views = []
+
+        available_height = parent.winfo_height()
+        row_count = max(1, len(matches))
+
+        title_font_size = max(12, min(20, int(available_height * 0.022)))
+        estimated_row_height = max(24, int(available_height / max(6, row_count + 1)))
+
+        self.matches_title_label = ctk.CTkLabel(
+            parent,
+            text=t("matches"),
+            font=("Arial", title_font_size, "bold"),
+        )
+        self.matches_title_label.pack(pady=(2, 2))
+
+        self.matches_rows_container = ctk.CTkFrame(parent, fg_color="transparent")
+        self.matches_rows_container.pack(fill="both", expand=True, padx=4, pady=0)
+
+        rows = self.matches_rows_container
+        rows.grid_columnconfigure(0, weight=1)
+
+        for i in range(len(matches)):
+            rows.grid_rowconfigure(i, weight=1)
+
+        for row_index, match in enumerate(matches):
+            row_view = self._build_match_row(rows, match, row_index, estimated_row_height)
+            self.matches_row_views.append(row_view)
+
+        self.after(10, self._update_match_row_styles)
+        parent.bind("<Configure>", lambda _e: self.after(10, self._update_match_row_styles))
 
     def draw_bracket(self):
         self.show_bracket_view()

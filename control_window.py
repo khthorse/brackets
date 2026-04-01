@@ -582,7 +582,7 @@ class ControlWindow(ctk.CTkToplevel):
         if self.tournament_state.phase == "group_stage" and self.tournament_state.group_stage_model is not None:
             self.group_stage_model = self.tournament_state.group_stage_model
             self.draw_group_match_controls()
-            self.bracket_canvas.show_group_stage(self.group_stage_model)
+            self.bracket_canvas.refresh_group_stage()
             self.update_ui_for_phase()
             return
 
@@ -726,7 +726,7 @@ class ControlWindow(ctk.CTkToplevel):
                 self.check_allowed_cup_number(c2)
 
                 self.group_stage_model.update_match_result(match_index, c1, c2, winner)
-                self.bracket_canvas.show_group_stage(self.group_stage_model)
+                self.bracket_canvas.refresh_group_stage()
 
                 if hasattr(self, "draw_group_match_controls"):
                     self.draw_group_match_controls()
@@ -883,7 +883,7 @@ class ControlWindow(ctk.CTkToplevel):
                 self.check_allowed_cup_number(c1)
                 self.check_allowed_cup_number(c2)
                 self.group_stage_model.update_match_result(match_index, c1, c2, winner_var.get())
-                self.bracket_canvas.show_group_stage(self.group_stage_model)
+                self.bracket_canvas.refresh_group_stage()
                 self.draw_group_match_controls()
                 top.destroy()
             except ValueError as e:
@@ -903,7 +903,7 @@ class ControlWindow(ctk.CTkToplevel):
 
     def clear_group_result(self, match_index):
         self.group_stage_model.clear_match_result(match_index)
-        self.bracket_canvas.show_group_stage(self.group_stage_model)
+        self.bracket_canvas.refresh_group_stage()
         self.draw_group_match_controls()
 
     def set_group_match_time(self, match_index):
@@ -924,7 +924,7 @@ class ControlWindow(ctk.CTkToplevel):
                 return
 
             self.group_stage_model.matches[match_index].time = new_time
-            self.bracket_canvas.show_group_stage(self.group_stage_model)
+            self.bracket_canvas.refresh_group_stage()
             self.draw_group_match_controls()
             top.destroy()
 
