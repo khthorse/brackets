@@ -139,12 +139,34 @@ def refresh_language_ui():
     brackets_label.configure(text=app_state.title)
     timer_label.configure(text=t("countdown_timer"))
 
+    reopen_control_button.configure(text=t("open_control_window"))
+
     for timer in timers:
         timer.refresh_texts()
 
     bracket_frame.refresh_language()
 
     control_window.refresh_texts()
+
+def show_reopen_control_button():
+    reopen_control_button.place(relx=1.0, rely=0.0, anchor="ne", x=-20, y=20)
+
+
+def hide_reopen_control_button():
+    reopen_control_button.place_forget()
+
+
+def reopen_control_window():
+    control_window.deiconify()
+    control_window.lift()
+    control_window.focus_force()
+    hide_reopen_control_button()
+
+def show_control_window():
+    control_window.deiconify()
+    control_window.lift()
+    control_window.focus_force()
+    hide_reopen_control_button()
 
 ctk.set_appearance_mode('dark')
 #ctk.set_default_color_theme('green')
@@ -238,9 +260,24 @@ control_window = ControlWindow(
     language_changed_callback=refresh_language_ui,
 )
 
+reopen_control_button = ctk.CTkButton(
+    root,
+    text=t("open_control_window"),
+    command=lambda: reopen_control_window(),
+)
+reopen_control_button.place_forget()
+
+def on_control_window_close():
+    control_window.withdraw()
+    show_reopen_control_button()
+
+control_window.protocol("WM_DELETE_WINDOW", on_control_window_close)
+
 control_monitor = get_secondary_monitor(settings.fullscreen_monitor_index)
 
 control_window.update_idletasks()
 apply_control_window_on_monitor(control_window, control_monitor)
+
+
 
 root.mainloop()

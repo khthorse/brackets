@@ -41,6 +41,7 @@ LANGUAGES = {
         "language_no": "Norsk",
         "language_en": "English",
         "loading": "Laster",
+        "open_control_window": "Åpne kontrollvindu",
 
         "timer_controls": "Timerkontroll",
         "table_label": "Bord {index}",
@@ -183,6 +184,7 @@ LANGUAGES = {
         "language_no": "Norsk",
         "language_en": "English",
         "loading": "Loading",
+        "open_control_window": "Open control window",
 
         "timer_controls": "Timer Controls",
         "table_label": "Table {index}",

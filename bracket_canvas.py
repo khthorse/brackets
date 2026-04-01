@@ -550,19 +550,19 @@ class TournamentBracketCanvas(ctk.CTkFrame):
             header,
             text=t("points_label"),
             font=("Arial", header_font_size, "bold"),
-        ).grid(row=0, column=3, padx=2, pady=1)
+        ).grid(row=0, column=3, padx=2, pady=1, sticky="e")
 
         ctk.CTkLabel(
             header,
             text=t("hit_label"),
             font=("Arial", header_font_size, "bold"),
-        ).grid(row=0, column=4, padx=2, pady=1)
+        ).grid(row=0, column=4, padx=2, pady=1, sticky="e")
 
         ctk.CTkLabel(
             header,
             text=t("diff_label"),
             font=("Arial", header_font_size, "bold"),
-        ).grid(row=0, column=5, padx=2, pady=1)
+        ).grid(row=0, column=5, padx=2, pady=1, sticky="e")
 
         return header
 
@@ -765,7 +765,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         estimated_row_height = max(24, int(available_height / max(6, row_count + 2)))
 
         row_font_size = max(8, min(14, int(estimated_row_height * 0.42)))
-        stat_font_size = max(7, min(11, int(estimated_row_height * 0.32)))
+        stat_font_size = max(7, min(11, int(estimated_row_height * 2)))
 
         row_corner = max(4, int(estimated_row_height * 0.22))
         stat_corner = max(4, int(estimated_row_height * 0.14))
@@ -773,8 +773,9 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         row_inner_pady = max(0, int(estimated_row_height * 0.05))
         row_inner_padx = max(2, int(estimated_row_height * 0.12))
 
-        stat_box_padx = max(1, int(estimated_row_height * 0.05))
-        stat_box_pady = max(2, int(estimated_row_height * 0.12))
+        stat_box_padx = max(1, int(estimated_row_height * 0.2))
+        stat_box_pady = max(2, int(estimated_row_height * 0.16))
+        
 
         logo_size = max(10, int(estimated_row_height * 0.62))
 
