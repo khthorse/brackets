@@ -8,6 +8,7 @@ from tkinter import TclError
 from paths import resource_path
 from time_utils import normalize_time_input, is_valid_mmss, mmss_to_seconds
 from translations import t
+from ui_theme import get_dark_theme
 
 try:
     import winsound
@@ -25,7 +26,8 @@ class Timer:
         scale=1.0,
         timer_index=None,
         use_table_label=False,
-    ):
+    ):  
+        self.ui = get_dark_theme()
         self.timer_index = timer_index
         self.use_table_label = use_table_label
         self.master = master
@@ -67,7 +69,7 @@ class Timer:
         self.canvas_size = max(120, int(250 * self.scale))
         pad = max(4, int(10 * self.scale))
 
-        bg_color = "#2b2b2b"
+        bg_color = self.ui.timer_bg
         self.canvas = ctk.CTkCanvas(
             self.frame,
             width=self.canvas_size,
@@ -87,7 +89,7 @@ class Timer:
             extent=0,
             style="arc",
             width=self.base_arc_width,
-            outline="#4682B4",
+            outline=self.ui.timer_arc,
         )
  
         time_font_size = max(18, int(40 * self.scale))
@@ -97,7 +99,7 @@ class Timer:
             self.canvas_size / 2,
             text="",
             font=("Helvetica", time_font_size),
-            fill="white",
+            fill=self.ui.timer_text,
         )
 
         if self.show_controls:

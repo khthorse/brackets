@@ -6,6 +6,7 @@ from typing import Optional
 from PIL import Image, ImageTk
 
 from translations import t
+from ui_theme import get_dark_theme
 
 @dataclass
 class StandingsRowView:
@@ -41,6 +42,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         super().__init__(master, *args, border_width=0, fg_color="#2b2b2b", **kwargs)
         self.tournament_model = tournament_model
         self.settings = settings
+        self.ui = get_dark_theme()
 
         self.pack(fill="both", expand=True)
 
@@ -68,16 +70,41 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         self._loading_job = None
         self._loading_step = 0
 
-        self.bracket_view = ctk.CTkFrame(self, fg_color="#2b2b2b")
+        self.bracket_view = ctk.CTkFrame(self, fg_color=self.ui.bg_main)
         self.bracket_view.pack(fill="both", expand=True)
 
-        canvas_bg = "#2B2B2B"
+        canvas_bg = self.ui.bg_main
         self.canvas = tk.Canvas(self.bracket_view, bg=canvas_bg, highlightthickness=0, bd=0)
         self.canvas.pack(fill="both", expand=True)
         self.canvas.bind("<Configure>", lambda event: self.draw_bracket())
 
-        self.group_stage_view = ctk.CTkFrame(self, fg_color="#2b2b2b")
+        self.group_stage_view = ctk.CTkFrame(self, fg_color=self.ui.bg_main)
 
+    def _calc_standings_metrics(self, row_height):
+        ui = self.ui
+
+        return {
+            "row_font_size": max(ui.min_row_font, min(ui.max_row_font, int(row_height * ui.row_font_scale))),
+            "stat_font_size": max(ui.min_stat_font, min(ui.max_stat_font, int(row_height * ui.stat_font_scale))),
+            "row_corner": max(ui.min_corner, int(row_height * ui.row_corner_scale)),
+            "stat_corner": max(ui.min_corner, int(row_height * ui.stat_corner_scale)),
+            "logo_size": max(ui.min_logo_size, int(row_height * ui.logo_scale)),
+            "row_inner_padx": max(ui.min_row_inner_padx, int(row_height * ui.row_inner_padx_scale)),
+            "row_inner_pady": max(ui.min_row_inner_pady, int(row_height * ui.row_inner_pady_scale)),
+            "stat_box_padx": max(ui.min_stat_box_padx, int(row_height * ui.stat_box_padx_scale)),
+            "stat_box_pady": max(ui.min_stat_box_pady, int(row_height * ui.stat_box_pady_scale)),
+        }
+    
+    def _calc_match_metrics(self, row_height):
+        ui = self.ui
+
+        return {
+            "time_font_size": max(ui.min_match_time_font, min(ui.max_match_time_font, int(row_height * ui.match_time_scale))),
+            "team_font_size": max(ui.min_match_team_font, min(ui.max_match_team_font, int(row_height * ui.match_team_scale))),
+            "vs_font_size": max(ui.min_match_vs_font, min(ui.max_match_vs_font, int(row_height * ui.match_vs_scale))),
+            "row_corner": max(ui.min_corner, int(row_height * ui.match_row_corner_scale)),
+            "row_inner_pady": max(ui.min_match_row_inner_pady, int(row_height * ui.match_row_inner_pady_scale)),
+        }
 
     def show_bracket_view(self):
         if self.group_stage_view.winfo_manager():
@@ -108,7 +135,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         self.loading_window = tk.Toplevel(root)
         self.loading_window.overrideredirect(True)
         self.loading_window.geometry(f"{w}x{h}+{x}+{y}")
-        self.loading_window.configure(bg="#2b2b2b")
+        self.loading_window.configure(bg=self.ui.bg_main)
         self.loading_window.attributes("-topmost", True)
 
         size = 220
@@ -119,7 +146,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
             self.loading_window,
             width=size,
             height=size,
-            bg="#2b2b2b",
+            bg=self.ui.bg_main,
             highlightthickness=0,
             bd=0,
         )
@@ -131,7 +158,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
             size - pad,
             size - pad,
             width=line_width,
-            outline="#4682B4",
+            outline=self.ui.accent,
         )
 
         self.loading_text_base = text if text is not None else t("loading")
@@ -142,7 +169,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
             size / 2,
             text=self.loading_text_base,
             font=("Helvetica", 18, "bold"),
-            fill="white",
+            fill=self.ui.text_primary,
         )
 
         self.loading_window.update()
@@ -376,7 +403,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
             row_view.hit_label.configure(text=str(team.cups_hit))
             row_view.diff_label.configure(text=str(team.total_cups_diff))
 
-            row_color = "#3a3a3a" if idx <= 4 else "#333333"
+            row_color = self.ui.bg_row_top if idx <= 4 else self.ui.bg_row_normal
             row_view.frame.configure(fg_color=row_color)
 
             if row_view.logo_label is not None:
@@ -644,13 +671,13 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         ctk.CTkLabel(
             row,
             text="",
-            font=("Arial", row_font_size),
+            font=(self.ui.font_main, row_font_size),
         ).grid(row=0, column=0, padx=row_inner_padx, pady=row_inner_pady, sticky="ns")
 
         position_label = ctk.CTkLabel(
             row,
             text=str(idx),
-            font=("Arial", row_font_size),
+            font=(self.ui.font_main, row_font_size),
         )
         position_label.grid(row=0, column=1, padx=row_inner_padx, pady=row_inner_pady)
 
@@ -660,7 +687,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         placeholder_name_label = ctk.CTkLabel(
             name_wrap,
             text=team.name,
-            font=("Arial", row_font_size),
+            font=(self.ui.font_main, row_font_size),
         )
         placeholder_name_label.pack(side="left")
 
@@ -698,7 +725,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
     def _create_stat_box(self, parent, row, column, value, font_size, corner_radius, padx, pady):
         box = ctk.CTkFrame(
             parent,
-            fg_color="#1f1f1f",
+            fg_color=self.ui.bg_stat_box,
             corner_radius=corner_radius,
         )
         box.grid(row=row, column=column, padx=padx, pady=pady, sticky="nsew")
@@ -707,7 +734,7 @@ class TournamentBracketCanvas(ctk.CTkFrame):
             box,
             text=value,
             fg_color="transparent",
-            font=("Consolas", font_size, "bold"),
+            font=(self.ui.font_mono, font_size, "bold"),
         )
         label.pack(expand=True, fill="both", padx=4, pady=2)
 
@@ -722,18 +749,20 @@ class TournamentBracketCanvas(ctk.CTkFrame):
             if row_height <= 1:
                 continue
 
-            row_font_size = max(8, min(14, int(row_height * 0.42)))
-            stat_font_size = max(7, min(11, int(row_height * 0.32)))
-            row_corner = max(4, int(row_height * 0.22))
-            stat_corner = max(4, int(row_height * 0.14))
+            metrics = self._calc_standings_metrics(row_height)
+
+            row_font_size = metrics["row_font_size"]
+            stat_font_size = metrics["stat_font_size"]
+            row_corner = metrics["row_corner"]
+            stat_corner = metrics["stat_corner"]
 
             row_view.frame.configure(corner_radius=row_corner)
 
-            row_view.position_label.configure(font=("Arial", row_font_size))
-            row_view.name_label.configure(font=("Arial", row_font_size))
-            row_view.points_label.configure(font=("Consolas", stat_font_size, "bold"))
-            row_view.hit_label.configure(font=("Consolas", stat_font_size, "bold"))
-            row_view.diff_label.configure(font=("Consolas", stat_font_size, "bold"))
+            row_view.position_label.configure(font=(self.ui.font_main, row_font_size))
+            row_view.name_label.configure(font=(self.ui.font_main, row_font_size))
+            row_view.points_label.configure(font=(self.ui.font_mono, stat_font_size, "bold"))
+            row_view.hit_label.configure(font=(self.ui.font_mono, stat_font_size, "bold"))
+            row_view.diff_label.configure(font=(self.ui.font_mono, stat_font_size, "bold"))
 
             if row_view.points_box is not None:
                 row_view.points_box.configure(corner_radius=stat_corner)
@@ -764,20 +793,17 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         # Disse er bare startverdier før vi kjenner faktisk radhøyde
         estimated_row_height = max(24, int(available_height / max(6, row_count + 2)))
 
-        row_font_size = max(8, min(14, int(estimated_row_height * 0.42)))
-        stat_font_size = max(7, min(11, int(estimated_row_height * 2)))
+        metrics = self._calc_standings_metrics(estimated_row_height)
 
-        row_corner = max(4, int(estimated_row_height * 0.22))
-        stat_corner = max(4, int(estimated_row_height * 0.14))
-
-        row_inner_pady = max(0, int(estimated_row_height * 0.05))
-        row_inner_padx = max(2, int(estimated_row_height * 0.12))
-
-        stat_box_padx = max(1, int(estimated_row_height * 0.2))
-        stat_box_pady = max(2, int(estimated_row_height * 0.16))
-        
-
-        logo_size = max(10, int(estimated_row_height * 0.62))
+        row_font_size = metrics["row_font_size"]
+        stat_font_size = metrics["stat_font_size"]
+        row_corner = metrics["row_corner"]
+        stat_corner = metrics["stat_corner"]
+        row_inner_padx = metrics["row_inner_padx"]
+        row_inner_pady = metrics["row_inner_pady"]
+        stat_box_padx = metrics["stat_box_padx"]
+        stat_box_pady = metrics["stat_box_pady"]
+        logo_size = metrics["logo_size"]
 
         self.standings_title_label = ctk.CTkLabel(
             parent,
@@ -872,33 +898,40 @@ class TournamentBracketCanvas(ctk.CTkFrame):
             if row_height <= 1:
                 continue
 
-            time_font_size = max(7, min(11, int(row_height * 0.28)))
-            team_font_size = max(7, min(13, int(row_height * 0.36)))
-            vs_font_size = max(7, min(13, int(row_height * 0.34)))
-            row_corner = max(4, int(row_height * 0.22))
-            row_inner_pady = max(0, int(row_height * 0.10))
+            metrics = self._calc_match_metrics(row_height)
+
+            metrics = self._calc_match_metrics(row_height)
+
+            time_font_size = metrics["time_font_size"]
+            team_font_size = metrics["team_font_size"]
+            vs_font_size = metrics["vs_font_size"]
+            row_corner = metrics["row_corner"]
+            row_inner_pady = metrics["row_inner_pady"]
 
             row_view.frame.configure(corner_radius=row_corner)
-            row_view.time_label.configure(font=("Arial", time_font_size))
-            row_view.vs_label.configure(font=("Arial", vs_font_size, "bold"))
+            row_view.time_label.configure(font=(self.ui.font_main, time_font_size))
+            row_view.vs_label.configure(font=(self.ui.font_main, vs_font_size, "bold"))
 
-            font1 = ("Arial", team_font_size, "overstrike") if match.played and match.winner == 2 else ("Arial", team_font_size)
-            font2 = ("Arial", team_font_size, "overstrike") if match.played and match.winner == 1 else ("Arial", team_font_size)
+            font1 = (self.ui.font_main, team_font_size, "overstrike") if match.played and match.winner == 2 else (self.ui.font_main, team_font_size)
+            font2 = (self.ui.font_main, team_font_size, "overstrike") if match.played and match.winner == 1 else (self.ui.font_main, team_font_size)
 
             row_view.team1_label.configure(font=font1, pady=row_inner_pady)
             row_view.team2_label.configure(font=font2, pady=row_inner_pady)
 
 
     def _build_match_row(self, parent, match, row_index, estimated_row_height):
-        row_corner = max(4, int(estimated_row_height * 0.22))
-        row_inner_pady = max(0, int(estimated_row_height * 0.10))
-        time_font_size = max(7, min(11, int(estimated_row_height * 0.28)))
-        team_font_size = max(7, min(13, int(estimated_row_height * 0.36)))
-        vs_font_size = max(7, min(13, int(estimated_row_height * 0.34)))
+        
+        metrics = self._calc_match_metrics(estimated_row_height)
+
+        row_corner = metrics["row_corner"]
+        row_inner_pady = metrics["row_inner_pady"]
+        time_font_size = metrics["time_font_size"]
+        team_font_size = metrics["team_font_size"]
+        vs_font_size = metrics["vs_font_size"]
 
         row = ctk.CTkFrame(
             parent,
-            fg_color="#333333",
+            fg_color=self.ui.bg_row_normal,
             corner_radius=row_corner,
         )
         row.grid(row=row_index, column=0, sticky="nsew", padx=4, pady=1)
@@ -918,8 +951,8 @@ class TournamentBracketCanvas(ctk.CTkFrame):
         time_label = ctk.CTkLabel(
             row,
             text=time_text,
-            font=("Arial", time_font_size),
-            text_color="#cccccc",
+            font=(self.ui.font_main, time_font_size),
+            text_color=self.ui.text_muted,
         )
         time_label.grid(row=0, column=0, padx=4, pady=row_inner_pady, sticky="w")
 

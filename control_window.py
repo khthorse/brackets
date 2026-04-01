@@ -789,7 +789,18 @@ class ControlWindow(ctk.CTkToplevel):
             self.group_stage_model = self.tournament_state.group_stage_model
         else:
             self.group_stage_model = GroupStageModel(self.teams)
-            self.group_stage_model.generate_matches()
+
+            try:
+                self.group_stage_model.generate_matches()
+            except ValueError as e:
+                self._show_message_dialog(
+                    t("error_title"),
+                    str(e),
+                    420,
+                    160
+                )
+                return
+
             self.tournament_state.group_stage_model = self.group_stage_model
 
         self.tournament_state.phase = "group_stage"

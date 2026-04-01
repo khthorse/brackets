@@ -139,7 +139,8 @@ class GroupStageModel:
         random.shuffle(teams_shuffled)
 
         n = len(teams_shuffled)
-        assert n % 2 == 0, t("even_number_of_teams_required")
+        if n % 2 != 0:
+            raise ValueError(t("even_number_of_teams_required"))
 
         round1 = []
         for i in range(0, n, 2):
